@@ -1,6 +1,7 @@
 # TODO - could also use rep score to apply for weight on local models
 # TODO - save detector's fav neighbors and create a HTML with slider to see fav neighbors change
-# TODO - resume
+# TODO - resume functionality
+# TODO - location, direction add to detector
 
 import Detector
 
@@ -14,7 +15,6 @@ import pandas as pd
 from datetime import datetime
 import pickle
 import argparse
-from copy import deepcopy
 
 from build_lstm import build_lstm
 from build_gru import build_gru
@@ -55,7 +55,8 @@ parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number 
 parser.add_argument('-ms', '--max_data_size', type=int, default=24, help='maximum data length for training in each communication round, simulating the memory space a detector has')
 
 # arguments for fav_neighbor fl
-parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
+parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors, strategy 1')
+parser.add_argument('-k', '--k', type=float, default=None, help='maximum number of fav_neighbors. radius and k can be used together, but radius has the priority')
 parser.add_argument('-et', '--error_type', type=str, default="MAE", help='the error type to evaluate potential neighbors')
 parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to try in each round')
 parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='detector has a probability to kick out worst neighbors to explore new neighbors')
@@ -72,6 +73,9 @@ args = args.__dict__
 config_vars = args
 starting_data_index = 0 # later used for resuming
 STARTING_ROUND = 1
+
+# init vars
+get_error = vars()[f'get_{config_vars["error_type"]}']
 
 all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f]
 print(f'We have {len(all_detector_files)} detectors available.')
@@ -97,7 +101,7 @@ for detector_file_iter in range(len(all_detector_files)):
     print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
     whole_data_list.append(whole_data)
     # create a detector object
-    detector = Detector(detector_id, whole_data, radius=config_vars['radius'], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'], preserve_historical_model_files = config_vars['preserve_historical_models'])
+    detector = Detector(detector_id, whole_data, radius=config_vars['radius'], k=config_vars['k'],num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'], preserve_historical_model_files = config_vars['preserve_historical_models'])
     list_of_detectors[detector_id] = detector
     
 # create log folder indicating by current running date and time
@@ -115,17 +119,7 @@ naive_fl_model_path = f'{logs_dirpath}/naive_fl'
 fav_neighbors_fl_model_path = f'{logs_dirpath}/fav_neighbors_fl'
 
 build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
-if config_vars["error_type"] == 'MAE':
-    get_error = get_MAE
-elif config_vars["error_type"] == 'MSE':
-    get_error = get_MSE
-elif config_vars["error_type"] == 'RMSE':
-    get_error = get_RMSE
-elif config_vars["error_type"] == 'MAPE':
-    get_error = get_MAPE
-else:
-    sys.exit(f"{config_vars['error_type']} is an invalid error type.")
-    
+
 global_model_0 = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
 global_model_0.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
 os.makedirs(naive_fl_model_path, exist_ok=True)
@@ -134,8 +128,9 @@ global_model_0.save(f'{naive_fl_model_path}/comm_0.h5')
 for detector_id, detector in list_of_detectors.items():
     detector.init_models(global_model_0)
     
-''' init prediction records '''
+''' init prediction records and fav_neighbor records'''
 detector_predicts = {}
+detector_fav_neighbors = {}
 for detector_file in all_detector_files:
     detector_id = detector_file.split('.')[0]
     detector_predicts[detector_id] = {}
@@ -147,12 +142,9 @@ for detector_file in all_detector_files:
     detector_predicts[detector_id]['fav_neighbors_fl'] = []
     # true
     detector_predicts[detector_id]['true'] = []
+    # fav_neighbor records
+    detector_fav_neighbors[detector_id] = []
     
-''' init fav_neighbor records '''
-detector_fav_neighbors = {}
-for detector_file in all_detector_files:
-    detector_id = detector_file.split('.')[0]
-    detector_predicts[detector_id] = []
 
 ''' get scaler '''
 scaler = get_scaler(pd.concat(whole_data_list))
@@ -307,16 +299,28 @@ for round in range(STARTING_ROUND, run_comm_rounds + 1):
         detector_predicts[detector_id]['fav_neighbors_fl'] = fav_neighbors_fl_model_predictions
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_model_predictions
         
-        ''' try new neighbors! '''
+        ''' if len(fav_neighbors) < k, try new neighbors! '''
+        try_new_neighbors = False
+        if detector.k:
+            if len(detector.fav_neighbors) < detector.k:
+                try_new_neighbors = True
+        else:
+            try_new_neighbors = True
+        
         # create temporary
         temp_model = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
         temp_model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
         detector.tried_neighbors = []
         candidate_count = min(config_vars['num_neighbors_try'], len(detector.neighbors) - len(detector.fav_neighbors))
         candidate_iter = 0
-        while candidate_count > 0:
+        while candidate_count > 0 and try_new_neighbors:
+            # k may be set to a very large number, so checking candidate_count is still necessary
             candidate_fav = detector.neighbors[candidate_iter]
             if candidate_fav not in detector.fav_neighbors:
+                if candidate_fav.id in detector.neighbor_to_last_accumulate:
+                    if round < detector.neighbor_to_last_accumulate[candidate_fav.id] + detector.neighbor_to_accumulate_interval[candidate_fav.id]:
+                        # skip this detector
+                        continue
                 detector.tried_neighbors.append(candidate_fav)
                 fav_neighbors_fl_models_weights.append(candidate_fav.fav_neighbors_fl_local_model.get_weights())
                 candidate_count -= 1
@@ -349,10 +353,21 @@ for round in range(STARTING_ROUND, run_comm_rounds + 1):
                     # kick randomly
                     for i in range(kick_num):
                         detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
-                                
+    
+    ''' Record Predictions '''                            
     predictions_record_saved_path = f'{logs_dirpath}/realtime_predicts.pkl'
     with open(predictions_record_saved_path, 'wb') as f:
         pickle.dump(detector_predicts, f)
+
+    ''' Record Fav Neighbors '''
+    fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
+    with open(fav_neighbors_record_saved_path, 'wb') as f:
+        pickle.dump(detector_fav_neighbors, f)
     
+    ''' Record Resume Round'''
+    config_vars["last_round"] = round
+    with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
+        pickle.dump(config_vars, f)
+ 
     
     

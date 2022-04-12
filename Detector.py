@@ -4,14 +4,16 @@ import random
 import os
 
 class Detector:
-    def __init__(self, id, dataset, radius=None,latitude=None, longitude=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2, preserve_historical_model_files=0) -> None:
+    def __init__(self, id, dataset, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2, preserve_historical_model_files=0) -> None:
         self.id = id
         self.loc = (latitude, longitude)
+        self.direction = direction
         self._dataset = dataset # read in csv
         self._current_round_X_test = None
         self._current_round_y_true = None
         self.radius = radius # treat detectors within this radius as neighbors, unit miles. Default to None - consider every participating detector
         # 3 models to report and compare
+        self.k = k # set maximum number of possible fav_neighbors. Can be used with radius
         self.stand_alone_model = None
         self.naive_fl_local_model = None # CCGrid
         self.naive_fl_model = None # CCGrid
