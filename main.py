@@ -32,10 +32,13 @@ import random
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
 
+# arguments for system vars
 parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/traffic_data/', help='dataset path')
 parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/KFRT_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 
+# arguments for resume training
+parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
 
 # arguments for learning
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
@@ -47,7 +50,7 @@ parser.add_argument('-ff', '--num_feedforward', type=int, default=12, help='numb
 parser.add_argument('-tp', '--train_percent', type=float, default=1.0, help='percentage of the data for training')
 
 # arguments for federated learning
-parser.add_argument('-c', '--comm_comm_rounds', type=int, default=None, help='number of comm comm_rounds, default aims to run until data is exhausted')
+parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
 parser.add_argument('-ms', '--max_data_size', type=int, default=24, help='maximum data length for training in each communication comm_round, simulating the memory space a detector has')
 
 # arguments for fav_neighbor fl
@@ -64,147 +67,160 @@ args = parser.parse_args()
 args = args.__dict__
 ''' Parse command line arguments '''
 
-''' logistics '''
-# save command line arguments
-config_vars = args
-starting_data_index = 0 # later used for resuming
-STARTING_comm_round = 1
-
-# init vars
-get_error = vars()[f'get_{config_vars["error_type"]}']
-Detector.preserve_historical_models = config_vars['preserve_historical_models']
-
 # read in detector file paths
 all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
 print(f'We have {len(all_detector_files)} detectors available.')
 # read in detector location file
 detector_location_file = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and 'location' in f][0]
-detector_locations = pd.read_csv(os.path.join(config_vars['dataset_path'], detector_location_file))
+detector_locations = pd.read_csv(os.path.join(args['dataset_path'], detector_location_file))
 
-''' create detector object and load data for each detector '''
-whole_data_list = [] # to calculate scaler
-individual_min_data_sample = float('inf') # to determine max comm comm_rounds
-list_of_detectors = {}
-for detector_file_iter in range(len(all_detector_files)):
-    detector_file_name = all_detector_files[detector_file_iter]
-    detector_id = detector_file_name.split('.')[0]
-    # data file path
-    file_path = os.path.join(config_vars['dataset_path'], detector_file_name)
-    
-    # count lines to later determine max comm comm_rounds
-    whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
-    read_to_line = int(whole_data.shape[0] * config_vars["train_percent"])
-    individual_min_data_sample = read_to_line if read_to_line < individual_min_data_sample else individual_min_data_sample
-    
-    whole_data = whole_data[:read_to_line]
-    print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
-    whole_data_list.append(whole_data)
-    # create a detector object
-    detector = Detector(detector_id, whole_data, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
-    list_of_detectors[detector_id] = detector
-    
-# create log folder indicating by current running date and time
-date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
-logs_dirpath = f"{args['logs_base_folder']}/{date_time}_{args['model']}_input_{args['input_length']}_mds_{args['max_data_size']}_epoch_{args['epochs']}"
-os.makedirs(logs_dirpath, exist_ok=True)
-    
-''' detector assign neighbors (candidate fav neighbors) '''
-for detector_id, detector in list_of_detectors.items():
-    detector.assign_neighbors(list_of_detectors)
+# determine if resume training
+if args['resume_path']:
+    logs_dirpath = args['resume_path']
+    # load saved variables
+    with open(f"{logs_dirpath}/config_vars.pkl", 'rb') as f:
+        # overwrite all args
+        config_vars = pickle.load(f)
+        config_vars['resume_path'] = logs_dirpath
+    with open(f'{logs_dirpath}/realtime_predicts.pkl', 'wb') as f:
+        detector_predicts = pickle.load(f)
+    with open(f'{logs_dirpath}/fav_neighbors.pkl', 'wb') as f:
+        detector_fav_neighbors = pickle.load(f)
+    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+        list_of_detectors = pickle.load(f)
+    all_sensor_files = config_vars["all_sensor_files"]
+    STARTING_COMM_ROUND = config_vars["last_comm_round"] + 1
+    scaler = config_vars["scaler"]
+else:
+    # create log folder indicating by current running date and time
+    date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
+    logs_dirpath = f"{args['logs_base_folder']}/{date_time}_{args['model']}_input_{args['input_length']}_mds_{args['max_data_size']}_epoch_{args['epochs']}"
+    os.makedirs(logs_dirpath, exist_ok=True)
 
-''' detector init models '''
-stand_alone_model_path = f'{logs_dirpath}/stand_alone'
-naive_fl_global_model_path = f'{logs_dirpath}/naive_fl'
-fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl'
-
-build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
-
-global_model_0 = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
-global_model_0.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
-os.makedirs(naive_fl_global_model_path, exist_ok=True)
-global_model_0.save(f'{naive_fl_global_model_path}/comm_0.h5')
-# init models
-for detector_id, detector in list_of_detectors.items():
-    detector.init_models(global_model_0)
+    ''' logistics '''
+    # save command line arguments
+    config_vars = args
+    STARTING_COMM_ROUND = 1
     
-''' init prediction records and fav_neighbor records'''
-detector_predicts = {}
-detector_fav_neighbors = {}
-for detector_file in all_detector_files:
-    detector_id = detector_file.split('.')[0]
-    detector_predicts[detector_id] = {}
-    # baseline 1 - stand_alone
-    detector_predicts[detector_id]['stand_alone'] = []
-    # baseline 2 - naive global
-    detector_predicts[detector_id]['naive_fl'] = []
-    # fav_neighbors_fl model
-    detector_predicts[detector_id]['fav_neighbors_fl'] = []
-    # true
-    detector_predicts[detector_id]['true'] = []
-    # fav_neighbor records
-    detector_fav_neighbors[detector_id] = []
+    ''' create detector object and load data for each detector '''
+    whole_data_list = [] # to calculate scaler
+    individual_min_data_sample = float('inf') # to determine max comm rounds
+    list_of_detectors = {}
+    for detector_file_iter in range(len(all_detector_files)):
+        detector_file_name = all_detector_files[detector_file_iter]
+        detector_id = detector_file_name.split('.')[0]
+        # data file path
+        file_path = os.path.join(config_vars['dataset_path'], detector_file_name)
+        
+        # count lines to later determine max comm rounds
+        whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
+        read_to_line = int(whole_data.shape[0] * config_vars["train_percent"])
+        individual_min_data_sample = read_to_line if read_to_line < individual_min_data_sample else individual_min_data_sample
+        
+        whole_data = whole_data[:read_to_line]
+        print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
+        whole_data_list.append(whole_data)
+        # create a detector object
+        detector = Detector(detector_id, whole_data, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
+        list_of_detectors[detector_id] = detector
+        
+        
+    ''' detector assign neighbors (candidate fav neighbors) '''
+    for detector_id, detector in list_of_detectors.items():
+        detector.assign_neighbors(list_of_detectors)
     
+    ''' detector init models '''
+    stand_alone_model_path = f'{logs_dirpath}/stand_alone'
+    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl'
+    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl'
 
-''' get scaler '''
-scaler = get_scaler(pd.concat(whole_data_list))
-config_vars["scaler"] = scaler
-del whole_data_list
+    build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
+
+    global_model_0 = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
+    global_model_0.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
+    os.makedirs(naive_fl_global_model_path, exist_ok=True)
+    global_model_0.save(f'{naive_fl_global_model_path}/comm_0.h5')
+    # init models
+    for detector_id, detector in list_of_detectors.items():
+        detector.init_models(global_model_0)
+        
+    ''' init prediction records and fav_neighbor records'''
+    detector_predicts = {}
+    detector_fav_neighbors = {}
+    for detector_file in all_detector_files:
+        detector_id = detector_file.split('.')[0]
+        detector_predicts[detector_id] = {}
+        # baseline 1 - stand_alone
+        detector_predicts[detector_id]['stand_alone'] = []
+        # baseline 2 - naive global
+        detector_predicts[detector_id]['naive_fl'] = []
+        # fav_neighbors_fl model
+        detector_predicts[detector_id]['fav_neighbors_fl'] = []
+        # true
+        detector_predicts[detector_id]['true'] = []
+        # fav_neighbor records
+        detector_fav_neighbors[detector_id] = []
+    
+    ''' get scaler '''
+    scaler = get_scaler(pd.concat(whole_data_list))
+    config_vars["scaler"] = scaler
+    del whole_data_list
+    
+    ''' save used arguments as a text file for easy review '''
+    with open(f'{logs_dirpath}/args_used.txt', 'w') as f:
+        f.write("Command line arguments used -\n")
+        f.write(' '.join(sys.argv[1:]))
+        f.write("\n\nAll arguments used -\n")
+        for arg_name, arg in args.items():
+            f.write(f'\n--{arg_name} {arg}')
+
+# init vars
+get_error = vars()[f'get_{config_vars["error_type"]}']
+Detector.preserve_historical_models = config_vars['preserve_historical_models']
 
 ''' init FedAvg vars '''
 INPUT_LENGTH = config_vars['input_length']
-new_sample_size_per_comm_comm_round = INPUT_LENGTH
+new_sample_size_per_comm_round = INPUT_LENGTH
 
-# determine maximum comm comm_rounds by the minimum number of data sample a device owned and the input_length
-max_comm_comm_rounds = individual_min_data_sample // INPUT_LENGTH - 2
-# comm_comm_rounds overwritten while resuming
-if args['comm_comm_rounds']:
-    config_vars['comm_comm_rounds'] = args['comm_comm_rounds']
-    if max_comm_comm_rounds > config_vars['comm_comm_rounds']:
-        print(f"\nNote: the provided dataset allows running for maximum {max_comm_comm_rounds} comm comm_rounds but the simulation is configured to run for {config_vars['comm_comm_rounds']} comm comm_rounds.")
-        run_comm_comm_rounds = config_vars['comm_comm_rounds']
-    elif config_vars['comm_comm_rounds'] > max_comm_comm_rounds:
-        print(f"\nNote: the provided dataset ONLY allows running for maximum {max_comm_comm_rounds} comm comm_rounds, which is less than the configured {config_vars['comm_comm_rounds']} comm comm_rounds.")
-        run_comm_comm_rounds = max_comm_comm_rounds
+# determine maximum comm rounds by the minimum number of data sample a device owned and the input_length
+max_comm_rounds = individual_min_data_sample // INPUT_LENGTH - 2
+# comm_rounds overwritten while resuming
+if args['comm_rounds']:
+    config_vars['comm_rounds'] = args['comm_rounds']
+    if max_comm_rounds > config_vars['comm_rounds']:
+        print(f"\nNote: the provided dataset allows running for maximum {max_comm_rounds} comm rounds but the simulation is configured to run for {config_vars['comm_rounds']} comm rounds.")
+        run_comm_rounds = config_vars['comm_rounds']
+    elif config_vars['comm_rounds'] > max_comm_rounds:
+        print(f"\nNote: the provided dataset ONLY allows running for maximum {max_comm_rounds} comm rounds, which is less than the configured {config_vars['comm_rounds']} comm rounds.")
+        run_comm_rounds = max_comm_rounds
     else:
-        run_comm_comm_rounds = max_comm_comm_rounds
+        run_comm_rounds = max_comm_rounds
 else:
-    print(f"\nNote: the provided dataset allows running for maximum {max_comm_comm_rounds} comm comm_rounds.")
-    run_comm_comm_rounds = max_comm_comm_rounds
+    print(f"\nNote: the provided dataset allows running for maximum {max_comm_rounds} comm rounds.")
+    run_comm_rounds = max_comm_rounds
 
-''' save used arguments as a text file for easy review '''
-with open(f'{logs_dirpath}/args_used.txt', 'w') as f:
-    f.write("Command line arguments used -\n")
-    f.write(' '.join(sys.argv[1:]))
-    f.write("\n\nAll arguments used -\n")
-    for arg_name, arg in args.items():
-        f.write(f'\n--{arg_name} {arg}')
-        
-# store training config
-with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
-    pickle.dump(config_vars, f)
+print(f"Starting Federated Learning with total comm rounds {run_comm_rounds}...")
 
-print(f"Starting Federated Learning with total comm comm_rounds {run_comm_comm_rounds}...")
-
-for comm_round in range(STARTING_comm_round, run_comm_comm_rounds + 1):
-    print(f"Simulating comm comm_round {comm_round}/{run_comm_comm_rounds} ({comm_round/run_comm_comm_rounds:.0%})...")
+for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
+    print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
     if comm_round == 1:
-        training_data_starting_index = starting_data_index
-        training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_comm_round * 2 - 1
+        training_data_starting_index = 0
+        training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
         # if it's comm_round 1 and input_shape 12, need at least 24 training data points because the model at least needs 13 points to train.
         # Therefore,
         # comm_round 1 -> 1~24 training points, predict with test 13~35 test points, 
         # 1- 24， 2 - 36， 3 - 48， 4 - 60
     else:
-        training_data_ending_index = (comm_round + 1) * new_sample_size_per_comm_comm_round - 1
+        training_data_ending_index = (comm_round + 1) * new_sample_size_per_comm_round - 1
         training_data_starting_index = training_data_ending_index - config_vars['max_data_size']
         if training_data_starting_index < 1:
             training_data_starting_index = 0
     # test data
-    test_data_starting_index = training_data_ending_index - new_sample_size_per_comm_comm_round + 1
-    test_data_ending_index_one_step = test_data_starting_index + new_sample_size_per_comm_comm_round * 2 - 1
-    test_data_ending_index_chained_multi = test_data_starting_index + new_sample_size_per_comm_comm_round - 1
+    test_data_starting_index = training_data_ending_index - new_sample_size_per_comm_round + 1
+    test_data_ending_index_one_step = test_data_starting_index + new_sample_size_per_comm_round * 2 - 1
+    test_data_ending_index_chained_multi = test_data_starting_index + new_sample_size_per_comm_round - 1
     
     detecotr_iter = 1
     for detector_id, detector in list_of_detectors.items():
@@ -390,10 +406,12 @@ for comm_round in range(STARTING_comm_round, run_comm_comm_rounds + 1):
     with open(fav_neighbors_record_saved_path, 'wb') as f:
         pickle.dump(detector_fav_neighbors, f)
     
-    ''' Record Resume comm_round'''
+    ''' Record Resume Params '''
     config_vars["last_comm_round"] = comm_round
     with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
         pickle.dump(config_vars, f)
- 
+    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+        pickle.dump(list_of_detectors, f)
+    
     
     
