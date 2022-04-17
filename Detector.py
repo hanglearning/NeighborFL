@@ -2,23 +2,25 @@ import math
 from copy import deepcopy
 import random
 import os
+from haversine import haversine, Unit
 
 class Detector:
-    def __init__(self, id, dataset, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2, preserve_historical_model_files=0) -> None:
+    preserve_historical_models = 0
+    def __init__(self, id, dataset, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
         self.id = id
         self.loc = (latitude, longitude)
         self.direction = direction
         self._dataset = dataset # read in csv
-        self._current_round_X_test = None
-        self._current_round_y_true = None
+        self._current_comm_round_X_test = None
+        self._current_comm_round_y_true = None
         self.radius = radius # treat detectors within this radius as neighbors, unit miles. Default to None - consider every participating detector
         # 3 models to report and compare
         self.k = k # set maximum number of possible fav_neighbors. Can be used with radius
         self.stand_alone_model = None
         self.naive_fl_local_model = None # CCGrid
-        self.naive_fl_model = None # CCGrid
+        self.naive_fl_global_model = None # CCGrid
         self.fav_neighbors_fl_local_model = None
-        self.fav_neighbors_fl_model = None
+        self.fav_neighbors_fl_agg_model = None # aggregated
         self.fav_neighbors_fl_predictions = None
         self.to_compare_fav_neighbors_fl_predictions = None
         self.neighbors = [] # candidate neighbors
@@ -29,14 +31,13 @@ class Detector:
         self.neighbors_to_rep_score = {}
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
-        self.epsilon = epsilon # if model itself is worse than last round, roll a dice and kick a neighbor with the lowest reputation score, which is accumulated by error diffence. The larger the neighbor's model brings down the error, the better the neighbor
-        self.preserve_historical_models = preserve_historical_model_files
+        self.epsilon = epsilon # if model itself is worse than last comm_round, roll a dice and kick a neighbor with the lowest reputation score, which is accumulated by error diffence. The larger the neighbor's model brings down the error, the better the neighbor
             
     def assign_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():
             if detector == self:
                 continue
-            distance = math.sqrt((self.loc[0] - detector.loc[0]) ** 2 + (self.loc[1] - detector.loc[1]) ** 2)
+            distance = haversine(self.loc, detector.loc)
             if not self.radius:
                 # treat all participants as neighbors
                 self.neighbors.append((detector, distance))
@@ -52,33 +53,40 @@ class Detector:
             
     def init_models(self, global_model_0):
         self.stand_alone_model = deepcopy(global_model_0)
-        self.naive_fl_model = deepcopy(global_model_0)
-        self.fav_neighbors_fl_model = deepcopy(global_model_0)
+        self.naive_fl_global_model = deepcopy(global_model_0)
+        self.fav_neighbors_fl_agg_model = deepcopy(global_model_0)
         
-    def update_and_save_stand_alone_model(self, new_model, round, stand_alone_model_path):
+    def update_and_save_stand_alone_model(self, new_model, comm_round, stand_alone_model_path):
         self.stand_alone_model = new_model
-        self.stand_alone_model.save(f'{stand_alone_model_path}/{self.id}/comm_{round}.h5')
-        self.delete_historical_models(f'{stand_alone_model_path}/{self.id}', round)
+        os.makedirs(f'{stand_alone_model_path}/{self.id}', exist_ok=True)
+        self.stand_alone_model.save(f'{stand_alone_model_path}/{self.id}/comm_{comm_round}.h5')
+        self.delete_historical_models(f'{stand_alone_model_path}/{self.id}', comm_round)
     
     def update_naive_fl_local_model(self, new_model):
         self.naive_fl_local_model = new_model
         
     def update_fav_neighbors_fl_local_model(self, new_model):
         self.fav_neighbors_fl_local_model = new_model
+        
+    @classmethod
+    def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
+        new_model.save(f'{naive_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{naive_fl_global_model_path}', comm_round)
     
-    def update_and_save_naive_fl_model(self, new_model, round, naive_fl_model_path):
-        self.naive_fl_model = new_model
-        self.naive_fl_model.save(f'{naive_fl_model_path}/{self.id}/comm_{round}.h5')
-        self.delete_historical_models(f'{naive_fl_model_path}/{self.id}', round)
+    def update_naive_fl_global_model(self, new_model):
+        self.naive_fl_global_model = new_model
         
-    def update_and_save_fav_neighbors_fl_model(self, new_model, round, fav_neighbors_fl_model_path):
-        self.fav_neighbors_fl_model = new_model
-        self.fav_neighbors_fl_model.save(f'{fav_neighbors_fl_model_path}/{self.id}/comm_{round}.h5')
-        self.delete_historical_models(f'{fav_neighbors_fl_model_path}/{self.id}', round)
         
-    def delete_historical_models(self, model_root_path, round):
-        if not self.preserve_historical_models:
-            filelist = [f for f in os.listdir(model_root_path) if not f.endswith(f'comm_{round}.h5') and not f.endswith(f'comm_{round-1}.h5')]
+    def update_and_save_fav_neighbors_fl_agg_model(self, new_model, comm_round, fav_neighbors_fl_agg_model_path):
+        self.fav_neighbors_fl_agg_model = new_model
+        os.makedirs(f'{fav_neighbors_fl_agg_model_path}/{self.id}', exist_ok=True)
+        self.fav_neighbors_fl_agg_model.save(f'{fav_neighbors_fl_agg_model_path}/{self.id}/comm_{comm_round}.h5')
+        self.delete_historical_models(f'{fav_neighbors_fl_agg_model_path}/{self.id}', comm_round)
+    
+    @classmethod
+    def delete_historical_models(cls, model_root_path, comm_round):
+        if not cls.preserve_historical_models:
+            filelist = [f for f in os.listdir(model_root_path) if not f.endswith(f'comm_{comm_round}.h5') and not f.endswith(f'comm_{comm_round-1}.h5')]
             for f in filelist:
                 os.remove(os.path.join(model_root_path, f))
     
@@ -86,16 +94,16 @@ class Detector:
         return self._dataset
     
     def set_X_test(self, X_test):
-        self._current_round_X_test = X_test
+        self._current_comm_round_X_test = X_test
         
     def set_y_true(self, y_true):
-        self._current_round_y_true = y_true
+        self._current_comm_round_y_true = y_true
         
     def get_X_test(self):
-        return self._current_round_X_test
+        return self._current_comm_round_X_test
         
     def get_y_true(self):
-        return self._current_round_y_true
+        return self._current_comm_round_y_true
        
     
             

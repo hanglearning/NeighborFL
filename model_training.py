@@ -23,7 +23,7 @@ def train_model(model, X_train, y_train, batch, epochs):
     """train the baseline model 
 
     # Arguments
-        comm_round: FL communication round number
+        comm_comm_round: FL communication comm_round number
         model_path: model weights to load to continue training
         X_train: ndarray(number, lags), Input data for train.
         y_train: ndarray(number, ), label data for train.
