@@ -28,6 +28,10 @@ from error_calc import get_MAPE
 
 import random
 
+# remove some warnings
+import tensorflow as tf
+import logging
+tf.get_logger().setLevel(logging.ERROR)
 
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
