@@ -400,17 +400,18 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detecotr_iter += 1
     
     print(f"Summarizing comm_round {comm_round}...")
-    ''' Record Predictions '''                            
+    
+    print("Recording Predictions")                          
     predictions_record_saved_path = f'{logs_dirpath}/realtime_predicts.pkl'
     with open(predictions_record_saved_path, 'wb') as f:
         pickle.dump(detector_predicts, f)
 
-    ''' Record Fav Neighbors '''
+    print("Recording Fav Neighbors")
     fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
     with open(fav_neighbors_record_saved_path, 'wb') as f:
         pickle.dump(detector_fav_neighbors, f)
     
-    ''' Record Resume Params '''
+    print("Recording Resume Params")
     config_vars["last_comm_round"] = comm_round
     with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
         pickle.dump(config_vars, f)
