@@ -43,8 +43,6 @@ parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, 
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
-parser.add_argument('-sf', '--save_frequency', type=int, default=10, help='frequency of saving simulation progress (one time of saving may take a few minutes)')
-
 
 # arguments for learning
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
@@ -138,18 +136,21 @@ else:
     
     ''' detector init models '''
     stand_alone_model_path = f'{logs_dirpath}/stand_alone'
-    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl'
-    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl'
+    naive_fl_local_model_path = f'{logs_dirpath}/naive_fl_local'
+    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl_global'
+    fav_neighbors_fl_local_model_path = f'{logs_dirpath}/fav_neighbors_fl_local'
+    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl_agg'
 
     build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
 
     global_model_0 = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
     global_model_0.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
     os.makedirs(naive_fl_global_model_path, exist_ok=True)
-    global_model_0.save(f'{naive_fl_global_model_path}/comm_0.h5')
+    global_model_0_path = f'{naive_fl_global_model_path}/comm_0.h5'
+    global_model_0.save(global_model_0_path)
     # init models
     for detector_id, detector in list_of_detectors.items():
-        detector.init_models(global_model_0)
+        detector.init_models(global_model_0_path)
         
     ''' init prediction records and fav_neighbor records'''
     detector_predicts = {}
@@ -254,20 +255,20 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
         print(f"{detector_id} training stand_alone model.. (1/3)")
-        new_model = train_model(detector.stand_alone_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
+        new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_stand_alone_model(new_model, comm_round, stand_alone_model_path)
         # naive_fl local model
         print(f"{detector_id} training naive_fl local model.. (2/3)")
-        new_model = train_model(detector.naive_fl_global_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
-        detector.update_naive_fl_local_model(new_model)
+        new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
+        detector.update_and_save_naive_fl_local_model(new_model, comm_round, naive_fl_local_model_path)
         # fav_neighbors_fl local model
         print(f"{detector_id} training fav_neighbors_fl local model.. (3/3)")
-        new_model = train_model(detector.fav_neighbors_fl_agg_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
-        detector.update_fav_neighbors_fl_local_model(new_model)
+        new_model = train_model(detector.get_last_fav_neighbors_fl_agg_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
+        detector.update_and_save_fav_neighbors_fl_local_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
         
         ''' stand_alone model predictions '''
         print(f"{detector_id} is now predicting by its stand_alone model...")
-        stand_alone_predictions = detector.stand_alone_model.predict(X_test)
+        stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
         stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector_predicts[detector_id]['stand_alone'].append((comm_round,stand_alone_predictions))
 
@@ -276,24 +277,25 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     ''' Simulate Vanilla CCGrid FedAvg '''
     # create naive_fl model from all naive_fl_local models
     print("Predicting on naive fl model")
-    naive_fl_global_model = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
-    naive_fl_global_model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
+    new_naive_fl_global_model = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
+    new_naive_fl_global_model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
     naive_fl_local_models_weights = []
     for detector_id, detector in list_of_detectors.items():
-        naive_fl_local_models_weights.append(detector.naive_fl_local_model.get_weights())
-    naive_fl_global_model.set_weights(np.mean(naive_fl_local_models_weights, axis=0))
-    # save naive_fl_global_model
-    Detector.save_fl_global_model(naive_fl_global_model, comm_round, naive_fl_global_model_path)
+        naive_fl_local_models_weights.append(detector.get_naive_fl_local_model().get_weights())
+    new_naive_fl_global_model.set_weights(np.mean(naive_fl_local_models_weights, axis=0))
+    # save new_naive_fl_global_model
+    Detector.save_fl_global_model(new_naive_fl_global_model, comm_round, naive_fl_global_model_path)
     
     detecotr_iter = 1
     for detector_id, detector in list_of_detectors.items():
-        detector.update_naive_fl_global_model(naive_fl_global_model)
+        # update new_naive_fl_global_model
+        detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
         # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) now predicting by naive_fl_global_model")
-        naive_fl_global_model_predictions = naive_fl_global_model.predict(detector.get_X_test())
-        naive_fl_global_model_predictions = scaler.inverse_transform(naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+        print(f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) now predicting by new_naive_fl_global_model")
+        new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
+        new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
-        detector_predicts[detector_id]['naive_fl'].append((comm_round,naive_fl_global_model_predictions))
+        detector_predicts[detector_id]['naive_fl'].append((comm_round,new_naive_fl_global_model_predictions))
         detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
@@ -328,7 +330,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # create fav_neighbors_fl_agg_model based on the current fav neighbors
         fav_neighbors_fl_agg_model = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
         fav_neighbors_fl_agg_model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
-        fav_neighbors_fl_agg_models_weights = [detector.fav_neighbors_fl_local_model.get_weights()]
+        fav_neighbors_fl_agg_models_weights = [detector.get_fav_neighbors_fl_local_model().get_weights()]
         for fav_neighbor in detector.fav_neighbors:
             fav_neighbors_fl_agg_models_weights.append(fav_neighbor.fav_neighbors_fl_local_model.get_weights())
         fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
@@ -402,25 +404,24 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         print(f"{detector_id} kicks out {kicked_neighbor.id}")
         detecotr_iter += 1
     
-    if (comm_round - 1) % config_vars["save_frequency"] == 0:
-        print(f"Saving progress for comm_round {comm_round}...")
-        
-        print("Saving Predictions...")                          
-        predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
-        with open(predictions_record_saved_path, 'wb') as f:
-            pickle.dump(detector_predicts, f)
+    print(f"Saving progress for comm_round {comm_round}...")
+    
+    print("Saving Predictions...")                          
+    predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
+    with open(predictions_record_saved_path, 'wb') as f:
+        pickle.dump(detector_predicts, f)
 
-        print("Saving Fav Neighbors of All Detecors...")
-        fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
-        with open(fav_neighbors_record_saved_path, 'wb') as f:
-            pickle.dump(detector_fav_neighbors, f)
-        
-        print("Saving Resume Params...")
-        config_vars["resume_comm_round"] = comm_round + 1
-        with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
-            pickle.dump(config_vars, f)
-        with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
-            pickle.dump(list_of_detectors, f)
+    print("Saving Fav Neighbors of All Detecors...")
+    fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
+    with open(fav_neighbors_record_saved_path, 'wb') as f:
+        pickle.dump(detector_fav_neighbors, f)
     
-    
+    print("Saving Resume Params...")
+    config_vars["resume_comm_round"] = comm_round + 1
+    with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
+        pickle.dump(config_vars, f)
+    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+        pickle.dump(list_of_detectors, f)
+
+
     
