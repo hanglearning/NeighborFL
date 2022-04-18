@@ -29,13 +29,9 @@ from error_calc import get_MAPE
 import random
 
 # remove some warnings
-import tensorflow as tf
 import logging
-tf.get_logger().setLevel(logging.ERROR)
-
-import absl.logging
-logging.root.removeHandler(absl.logging._absl_handler)
-absl.logging._warn_preinit_stderr = False
+logging.disable(logging.WARNING)
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
@@ -47,6 +43,9 @@ parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, 
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
+parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
+parser.add_argument('-sf', '--save_frequency', type=int, default=10, help='frequency of saving simulation progress (one time of saving may take a few minutes)')
+
 
 # arguments for learning
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
@@ -82,6 +81,7 @@ print(f'We have {len(all_detector_files)} detectors available.')
 detector_location_file = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and 'location' in f][0]
 detector_locations = pd.read_csv(os.path.join(args['dataset_path'], detector_location_file))
 
+print("Preparing - e.g., create detector objects, init models.\nThis may take a few minutes...")
 # determine if resume training
 if args['resume_path']:
     logs_dirpath = args['resume_path']
@@ -97,7 +97,7 @@ if args['resume_path']:
     with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
         list_of_detectors = pickle.load(f)
     all_sensor_files = config_vars["all_sensor_files"]
-    STARTING_COMM_ROUND = config_vars["last_comm_round"] + 1
+    STARTING_COMM_ROUND = config_vars["resume_comm_round"]
     scaler = config_vars["scaler"]
 else:
     # create log folder indicating by current running date and time
@@ -403,24 +403,25 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         print(f"{detector_id} kicks out {kicked_neighbor.id}")
         detecotr_iter += 1
     
-    print(f"Summarizing comm_round {comm_round}...")
-    
-    print("Recording Predictions")                          
-    predictions_record_saved_path = f'{logs_dirpath}/realtime_predicts.pkl'
-    with open(predictions_record_saved_path, 'wb') as f:
-        pickle.dump(detector_predicts, f)
+    if (comm_round - 1) % config_vars["save_frequency"] == 0:
+        print(f"Saving progress for comm_round {comm_round}...")
+        
+        print("Saving Predictions...")                          
+        predictions_record_saved_path = f'{logs_dirpath}/realtime_predicts.pkl'
+        with open(predictions_record_saved_path, 'wb') as f:
+            pickle.dump(detector_predicts, f)
 
-    print("Recording Fav Neighbors")
-    fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
-    with open(fav_neighbors_record_saved_path, 'wb') as f:
-        pickle.dump(detector_fav_neighbors, f)
-    
-    print("Recording Resume Params")
-    config_vars["last_comm_round"] = comm_round
-    with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
-        pickle.dump(config_vars, f)
-    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
-        pickle.dump(list_of_detectors, f)
+        print("Saving Fav Neighbors of All Detecors...")
+        fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
+        with open(fav_neighbors_record_saved_path, 'wb') as f:
+            pickle.dump(detector_fav_neighbors, f)
+        
+        print("Saving Resume Params...")
+        config_vars["resume_comm_round"] = comm_round + 1
+        with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
+            pickle.dump(config_vars, f)
+        with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+            pickle.dump(list_of_detectors, f)
     
     
     
