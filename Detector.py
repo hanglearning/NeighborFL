@@ -8,11 +8,11 @@ from keras.models import load_model
 class Detector:
     preserve_historical_models = 0
     num_models_to_delete = 0
-    def __init__(self, id, dataset, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
+    def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
         self.id = id
         self.loc = (latitude, longitude)
         self.direction = direction
-        self._dataset = dataset # read in csv
+        # self._dataset = dataset # save time while saving detector object to file
         self._current_comm_round_X_test = None
         self._current_comm_round_y_true = None
         self.radius = radius # treat detectors within this radius as neighbors, unit miles. Default to None - consider every participating detector
@@ -118,8 +118,8 @@ class Detector:
                 for f in filelist[:len(filelist) - cls.num_models_to_delete]:
                     os.remove(os.path.join(model_root_path, f))
     
-    def get_dataset(self):
-        return self._dataset
+    # def get_dataset(self):
+    #     return self._dataset
     
     def set_X_test(self, X_test):
         self._current_comm_round_X_test = X_test

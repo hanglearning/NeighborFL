@@ -109,7 +109,7 @@ else:
     STARTING_COMM_ROUND = 1
     
     ''' create detector object and load data for each detector '''
-    whole_data_list = [] # to calculate scaler
+    whole_data_record = {} # to calculate scaler
     individual_min_data_sample = float('inf') # to determine max comm rounds
     list_of_detectors = {}
     for detector_file_iter in range(len(all_detector_files)):
@@ -125,9 +125,9 @@ else:
         
         whole_data = whole_data[:read_to_line]
         print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
-        whole_data_list.append(whole_data)
+        whole_data_record[detector_id] = whole_data
         # create a detector object
-        detector = Detector(detector_id, whole_data, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
+        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
         list_of_detectors[detector_id] = detector
         
         
@@ -171,9 +171,8 @@ else:
         detector_fav_neighbors[detector_id] = []
     
     ''' get scaler '''
-    scaler = get_scaler(pd.concat(whole_data_list))
+    scaler = get_scaler(pd.concat(list(whole_data_record.values())))
     config_vars["scaler"] = scaler
-    del whole_data_list
     
     ''' save used arguments as a text file for easy review '''
     with open(f'{logs_dirpath}/args_used.txt', 'w') as f:
@@ -236,12 +235,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     for detector_id, detector in list_of_detectors.items():
         ''' Process traning data '''
         # slice training data
-        train_data = detector.get_dataset()[training_data_starting_index: training_data_ending_index + 1]
+        train_data = whole_data_record[detector_id][training_data_starting_index: training_data_ending_index + 1]
         # process training data
         X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH)
         ''' Process test data '''
         # slice test data
-        test_data = detector.get_dataset()[test_data_starting_index: test_data_ending_index_one_step + 1]
+        test_data = whole_data_record[detector_id][test_data_starting_index: test_data_ending_index_one_step + 1]
         # process test data
         X_test, _ = process_test_one_step(test_data, scaler, INPUT_LENGTH)
         _, y_true = process_test_multi_and_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'])
@@ -406,26 +405,26 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         print(f"{detector_id} kicks out {kicked_neighbor.id}")
         detecotr_iter += 1
     
-    if (comm_round - 1) % config_vars["save_frequency"] == 0:
+    # if (comm_round - 1) % config_vars["save_frequency"] == 0:
 
-        print(f"Saving progress for comm_round {comm_round}...")
-        
-        print("Saving Predictions...")                          
-        predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
-        with open(predictions_record_saved_path, 'wb') as f:
-            pickle.dump(detector_predicts, f)
+    print(f"Saving progress for comm_round {comm_round}...")
+    
+    print("Saving Predictions...")                          
+    predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
+    with open(predictions_record_saved_path, 'wb') as f:
+        pickle.dump(detector_predicts, f)
 
-        print("Saving Fav Neighbors of All Detecors...")
-        fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
-        with open(fav_neighbors_record_saved_path, 'wb') as f:
-            pickle.dump(detector_fav_neighbors, f)
-        
-        print("Saving Resume Params...")
-        config_vars["resume_comm_round"] = comm_round + 1
-        with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
-            pickle.dump(config_vars, f)
-        with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
-            pickle.dump(list_of_detectors, f)
+    print("Saving Fav Neighbors of All Detecors...")
+    fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
+    with open(fav_neighbors_record_saved_path, 'wb') as f:
+        pickle.dump(detector_fav_neighbors, f)
+    
+    print("Saving Resume Params...")
+    config_vars["resume_comm_round"] = comm_round + 1
+    with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
+        pickle.dump(config_vars, f)
+    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+        pickle.dump(list_of_detectors, f)
 
 
     
