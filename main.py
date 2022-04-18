@@ -43,7 +43,6 @@ parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, 
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
-parser.add_argument('-sf', '--save_frequency', type=int, default=5, help='frequency of saving simulation progress (one time of saving may take a few minutes)')
 
 # arguments for learning
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
@@ -185,7 +184,6 @@ else:
 # init vars
 get_error = vars()[f'get_{config_vars["error_type"]}']
 Detector.preserve_historical_models = config_vars['preserve_historical_models']
-Detector.num_models_to_delete = config_vars['save_frequency'] + 1
 
 ''' init FedAvg vars '''
 INPUT_LENGTH = config_vars['input_length']
@@ -405,8 +403,6 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         print(f"{detector_id} kicks out {kicked_neighbor.id}")
         detecotr_iter += 1
     
-    # if (comm_round - 1) % config_vars["save_frequency"] == 0:
-
     print(f"Saving progress for comm_round {comm_round}...")
     
     print("Saving Predictions...")                          
