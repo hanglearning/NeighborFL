@@ -368,7 +368,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         continue
                 detector.tried_neighbors.append(candidate_fav)
                 print(f"{detector_id} selects {candidate_fav.id} as a new potential neighbor.")
-                fav_neighbors_fl_agg_models_weights.append(candidate_fav.fav_neighbors_fl_local_model.get_weights())
+                fav_neighbors_fl_agg_models_weights.append(candidate_fav.get_fav_neighbors_fl_local_model().get_weights())
                 candidate_count -= 1
             candidate_iter += 1
                     
