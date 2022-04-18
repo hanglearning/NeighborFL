@@ -43,7 +43,6 @@ parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, 
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
-parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
 parser.add_argument('-sf', '--save_frequency', type=int, default=10, help='frequency of saving simulation progress (one time of saving may take a few minutes)')
 
 
