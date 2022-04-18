@@ -102,9 +102,10 @@ class Detector:
         cls.delete_historical_models(f'{naive_fl_global_model_path}', comm_round)
         
     def update_and_save_fav_neighbors_fl_agg_model(self, new_model, comm_round, fav_neighbors_fl_agg_model_path):
-        self.fav_neighbors_fl_agg_model = new_model
         os.makedirs(f'{fav_neighbors_fl_agg_model_path}/{self.id}', exist_ok=True)
-        self.fav_neighbors_fl_agg_model.save(f'{fav_neighbors_fl_agg_model_path}/{self.id}/comm_{comm_round}.h5')
+        new_model_path = f'{fav_neighbors_fl_agg_model_path}/{self.id}/comm_{comm_round}.h5'
+        new_model.save(new_model_path)
+        self.fav_neighbors_fl_agg_model_path = new_model_path
         self.delete_historical_models(f'{fav_neighbors_fl_agg_model_path}/{self.id}', comm_round)
     
     @classmethod

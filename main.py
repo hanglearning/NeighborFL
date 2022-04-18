@@ -43,6 +43,7 @@ parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, 
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
+parser.add_argument('-sf', '--save_frequency', type=int, default=5, help='frequency of saving simulation progress (one time of saving may take a few minutes)')
 
 # arguments for learning
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
@@ -404,24 +405,26 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         print(f"{detector_id} kicks out {kicked_neighbor.id}")
         detecotr_iter += 1
     
-    print(f"Saving progress for comm_round {comm_round}...")
-    
-    print("Saving Predictions...")                          
-    predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
-    with open(predictions_record_saved_path, 'wb') as f:
-        pickle.dump(detector_predicts, f)
+    if (comm_round - 1) % config_vars["save_frequency"] == 0:
 
-    print("Saving Fav Neighbors of All Detecors...")
-    fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
-    with open(fav_neighbors_record_saved_path, 'wb') as f:
-        pickle.dump(detector_fav_neighbors, f)
-    
-    print("Saving Resume Params...")
-    config_vars["resume_comm_round"] = comm_round + 1
-    with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
-        pickle.dump(config_vars, f)
-    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
-        pickle.dump(list_of_detectors, f)
+        print(f"Saving progress for comm_round {comm_round}...")
+        
+        print("Saving Predictions...")                          
+        predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
+        with open(predictions_record_saved_path, 'wb') as f:
+            pickle.dump(detector_predicts, f)
+
+        print("Saving Fav Neighbors of All Detecors...")
+        fav_neighbors_record_saved_path = f'{logs_dirpath}/fav_neighbors.pkl'
+        with open(fav_neighbors_record_saved_path, 'wb') as f:
+            pickle.dump(detector_fav_neighbors, f)
+        
+        print("Saving Resume Params...")
+        config_vars["resume_comm_round"] = comm_round + 1
+        with open(f"{logs_dirpath}/config_vars.pkl", 'wb') as f:
+            pickle.dump(config_vars, f)
+        with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+            pickle.dump(list_of_detectors, f)
 
 
     
