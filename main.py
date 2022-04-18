@@ -71,13 +71,6 @@ args = parser.parse_args()
 args = args.__dict__
 ''' Parse command line arguments '''
 
-# read in detector file paths
-all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
-print(f'We have {len(all_detector_files)} detectors available.')
-# read in detector location file
-detector_location_file = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and 'location' in f][0]
-detector_locations = pd.read_csv(os.path.join(args['dataset_path'], detector_location_file))
-
 print("Preparing - i.e., create detector objects, init models, load data, etc,.\nThis may take a few minutes...")
 # determine if resume training
 if args['resume_path']:
@@ -87,33 +80,43 @@ if args['resume_path']:
         # overwrite all args
         config_vars = pickle.load(f)
         config_vars['resume_path'] = logs_dirpath
-    with open(f'{logs_dirpath}/all_detector_predicts.pkl', 'wb') as f:
+    with open(f'{logs_dirpath}/all_detector_predicts.pkl', 'rb') as f:
         detector_predicts = pickle.load(f)
-    with open(f'{logs_dirpath}/fav_neighbors.pkl', 'wb') as f:
+    with open(f'{logs_dirpath}/fav_neighbors.pkl', 'rb') as f:
         detector_fav_neighbors = pickle.load(f)
-    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
+    with open(f"{logs_dirpath}/list_of_detectors.pkl", 'rb') as f:
         list_of_detectors = pickle.load(f)
     with open(f"{logs_dirpath}/whole_data_record.pkl", 'rb') as f:
         whole_data_record = pickle.load(f)
-    all_sensor_files = config_vars["all_sensor_files"]
     STARTING_COMM_ROUND = config_vars["resume_comm_round"]
     scaler = config_vars["scaler"]
+    individual_min_data_sample = config_vars["individual_min_data_sample"]
+    detector_locations = config_vars["detector_locations"]
 else:
-    # create log folder indicating by current running date and time
-    date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
-    logs_dirpath = f"{args['logs_base_folder']}/{date_time}_{args['model']}_input_{args['input_length']}_mds_{args['max_data_size']}_epoch_{args['epochs']}"
-    os.makedirs(logs_dirpath, exist_ok=True)
-
     ''' logistics '''
     # save command line arguments
     config_vars = args
     STARTING_COMM_ROUND = 1
     
+    # read in detector file paths
+    all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
+    print(f'We have {len(all_detector_files)} detectors available.')
+    # read in detector location file
+    detector_location_file = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and 'location' in f][0]
+    detector_locations = pd.read_csv(os.path.join(args['dataset_path'], detector_location_file))
+    
+    config_vars["detector_locations"] = detector_locations
+
+    # create log folder indicating by current running date and time
+    date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
+    logs_dirpath = f"{args['logs_base_folder']}/{date_time}_{args['model']}_input_{args['input_length']}_mds_{args['max_data_size']}_epoch_{args['epochs']}"
+    os.makedirs(logs_dirpath, exist_ok=True)
+    
     ''' create detector object and load data for each detector '''
     whole_data_record = {} # to calculate scaler
     individual_min_data_sample = float('inf') # to determine max comm rounds
     list_of_detectors = {}
-    for detector_file_iter in range(len(all_detector_files)):
+    for detector_file_iter in range(len(list_of_detectors.keys())):
         detector_file_name = all_detector_files[detector_file_iter]
         detector_id = detector_file_name.split('.')[0]
         # data file path
@@ -125,12 +128,13 @@ else:
         individual_min_data_sample = read_to_line if read_to_line < individual_min_data_sample else individual_min_data_sample
         
         whole_data = whole_data[:read_to_line]
-        print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
+        print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(list_of_detectors.keys())})')
         whole_data_record[detector_id] = whole_data
         # create a detector object
         detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
         list_of_detectors[detector_id] = detector
-        
+    config_vars["individual_min_data_sample"] = individual_min_data_sample
+    
     # save dataset record for resume purpose
     with open(f"{logs_dirpath}/whole_data_record.pkl", 'wb') as f:
         pickle.dump(whole_data_record, f)
@@ -257,7 +261,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detector_predicts[detector_id]['true'].append((comm_round,y_true))
         
         ''' Training '''
-        print(f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
+        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
         print(f"{detector_id} training stand_alone model.. (1/3)")
         new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
@@ -296,7 +300,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # update new_naive_fl_global_model
         detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
         # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) now predicting by new_naive_fl_global_model")
+        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
         new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
         new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
@@ -308,7 +312,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     detecotr_iter = 1
     for detector_id, detector in list_of_detectors.items():
         ''' evaluate new potential neighbors' models '''
-        print_text = f"{detector_id} ({detecotr_iter}/{len(all_detector_files)}) simulating fav_neighbor FL"
+        print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL"
         print('-' * len(print_text))
         print(print_text)
         if detector.tried_neighbors:
