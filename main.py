@@ -332,7 +332,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         fav_neighbors_fl_agg_model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
         fav_neighbors_fl_agg_models_weights = [detector.get_fav_neighbors_fl_local_model().get_weights()]
         for fav_neighbor in detector.fav_neighbors:
-            fav_neighbors_fl_agg_models_weights.append(fav_neighbor.fav_neighbors_fl_local_model.get_weights())
+            fav_neighbors_fl_agg_models_weights.append(fav_neighbor.get_fav_neighbors_fl_local_model().get_weights())
         fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
         # save model
         detector.update_and_save_fav_neighbors_fl_agg_model(fav_neighbors_fl_agg_model, comm_round, fav_neighbors_fl_agg_model_path)
