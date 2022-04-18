@@ -356,7 +356,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detector.tried_neighbors = []
         candidate_count = min(config_vars['num_neighbors_try'], len(detector.neighbors) - len(detector.fav_neighbors))
         candidate_iter = 0
-        while candidate_count > 0 and try_new_neighbors:
+        while candidate_count > 0 and try_new_neighbors and candidate_iter < len(detector.neighbors):
             # k may be set to a very large number, so checking candidate_count is still necessary
             candidate_fav = detector.neighbors[candidate_iter][0]
             if candidate_fav not in detector.fav_neighbors:
