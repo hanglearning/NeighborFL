@@ -92,6 +92,13 @@ if args['resume_path']:
     scaler = config_vars["scaler"]
     individual_min_data_sample = config_vars["individual_min_data_sample"]
     detector_locations = config_vars["detector_locations"]
+    
+    stand_alone_model_path = f'{logs_dirpath}/stand_alone'
+    naive_fl_local_model_path = f'{logs_dirpath}/naive_fl_local'
+    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl_global'
+    fav_neighbors_fl_local_model_path = f'{logs_dirpath}/fav_neighbors_fl_local'
+    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl_agg'
+    build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
 else:
     ''' logistics '''
     # save command line arguments
