@@ -89,7 +89,7 @@ if args['resume_path']:
         # overwrite all args
         config_vars = pickle.load(f)
         config_vars['resume_path'] = logs_dirpath
-    with open(f'{logs_dirpath}/realtime_predicts.pkl', 'wb') as f:
+    with open(f'{logs_dirpath}/all_detector_predicts.pkl', 'wb') as f:
         detector_predicts = pickle.load(f)
     with open(f'{logs_dirpath}/fav_neighbors.pkl', 'wb') as f:
         detector_fav_neighbors = pickle.load(f)
@@ -406,7 +406,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"Saving progress for comm_round {comm_round}...")
         
         print("Saving Predictions...")                          
-        predictions_record_saved_path = f'{logs_dirpath}/realtime_predicts.pkl'
+        predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
         with open(predictions_record_saved_path, 'wb') as f:
             pickle.dump(detector_predicts, f)
 
