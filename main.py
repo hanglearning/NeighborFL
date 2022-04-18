@@ -116,7 +116,7 @@ else:
     whole_data_record = {} # to calculate scaler
     individual_min_data_sample = float('inf') # to determine max comm rounds
     list_of_detectors = {}
-    for detector_file_iter in range(len(list_of_detectors.keys())):
+    for detector_file_iter in range(len(all_detector_files)):
         detector_file_name = all_detector_files[detector_file_iter]
         detector_id = detector_file_name.split('.')[0]
         # data file path
