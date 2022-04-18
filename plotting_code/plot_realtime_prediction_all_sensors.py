@@ -23,7 +23,7 @@ from error_calc import get_MAPE
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg plot learning curves")
 
 # arguments for system vars
-parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
+parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_detector_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-pl', '--plot_last_comm_rounds', type=int, default=24, help='The number of the last comm rounds to plot. Will be a backup if starting_comm_round and ending_comm_round are not specified.')
 parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='epoch number to start plotting')
 parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='epoch number to end plotting')
@@ -107,7 +107,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     my_xticks.appendleft(0)
     
     ax.set_xticks(my_xticks)
-    xticklabels = list(range(config_vars["last_round"] - plot_last_comm_rounds, config_vars["last_round"] + 1, sing_x_density))
+    xticklabels = list(range(config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds, config_vars["resume_comm_round"], sing_x_density))
     # xticklabels[0] = 1
     ax.set_xticklabels(xticklabels, Fontsize = 9, rotation = 45)
     
@@ -253,7 +253,7 @@ def calculate_errors(plot_data):
             file.write(tabulate(error_values_df.round(2), headers='keys', tablefmt='psql'))
             file.write('\n')
     
-with open(f"{logs_dirpath}/realtime_predicts.pkl", 'rb') as f:
+with open(f"{logs_dirpath}/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
 detector_lists, plot_data = make_plot_data(detector_predicts)
 # plot_and_save(detector_lists, plot_data)

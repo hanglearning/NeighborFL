@@ -245,6 +245,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))
+        y_true = scaler.inverse_transform(y_true.reshape(-1, 1)).reshape(1, -1)[0]
         # record data
         detector.set_X_test(X_test)
         detector.set_y_true(y_true)
