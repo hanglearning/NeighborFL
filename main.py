@@ -293,7 +293,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         naive_fl_global_model_predictions = naive_fl_global_model.predict(detector.get_X_test())
         naive_fl_global_model_predictions = scaler.inverse_transform(naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
-        detector_predicts[detector_id]['naive_fl'] = naive_fl_global_model_predictions
+        detector_predicts[detector_id]['naive_fl'].append((comm_round,naive_fl_global_model_predictions))
         detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
@@ -338,7 +338,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"{detector_id} now predicting by its fav_neighbors_fl_agg_model.")
         fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['fav_neighbors_fl'] = fav_neighbors_fl_agg_model_predictions
+        detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round,fav_neighbors_fl_agg_model_predictions))
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
         ''' if len(fav_neighbors) < k, try new neighbors! '''
