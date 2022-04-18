@@ -93,6 +93,8 @@ if args['resume_path']:
         detector_fav_neighbors = pickle.load(f)
     with open(f"{logs_dirpath}/list_of_detectors.pkl", 'wb') as f:
         list_of_detectors = pickle.load(f)
+    with open(f"{logs_dirpath}/whole_data_record.pkl", 'rb') as f:
+        whole_data_record = pickle.load(f)
     all_sensor_files = config_vars["all_sensor_files"]
     STARTING_COMM_ROUND = config_vars["resume_comm_round"]
     scaler = config_vars["scaler"]
@@ -129,6 +131,9 @@ else:
         detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
         list_of_detectors[detector_id] = detector
         
+    # save dataset record for resume purpose
+    with open(f"{logs_dirpath}/whole_data_record.pkl", 'wb') as f:
+        pickle.dump(whole_data_record, f)
         
     ''' detector assign neighbors (candidate fav neighbors) '''
     for detector_id, detector in list_of_detectors.items():
@@ -308,8 +313,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(print_text)
         if detector.tried_neighbors:
             print(f"{detector_id} now evaluating new potential fav neighbors' ({set(d.id for d in detector.tried_neighbors)}) models.")
-            error_without_new_neighbors = get_error(y_true[0], detector.fav_neighbors_fl_predictions)
-            error_with_new_neighbors = get_error(y_true[0], detector.to_compare_fav_neighbors_fl_predictions)
+            error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)
+            error_with_new_neighbors = get_error(y_true, detector.to_compare_fav_neighbors_fl_predictions)
             error_diff = error_without_new_neighbors - error_with_new_neighbors
             for neighbor in detector.tried_neighbors:
                 if error_diff > 0:
