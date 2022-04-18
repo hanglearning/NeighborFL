@@ -80,7 +80,7 @@ print(f'We have {len(all_detector_files)} detectors available.')
 detector_location_file = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and 'location' in f][0]
 detector_locations = pd.read_csv(os.path.join(args['dataset_path'], detector_location_file))
 
-print("Preparing - e.g., create detector objects, init models.\nThis may take a few minutes...")
+print("Preparing - i.e., create detector objects, init models, load data, etc,.\nThis may take a few minutes...")
 # determine if resume training
 if args['resume_path']:
     logs_dirpath = args['resume_path']
