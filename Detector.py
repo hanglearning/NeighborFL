@@ -7,6 +7,7 @@ from keras.models import load_model
 
 class Detector:
     preserve_historical_models = 0
+    num_models_to_delete = 0
     def __init__(self, id, dataset, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
         self.id = id
         self.loc = (latitude, longitude)
@@ -111,9 +112,11 @@ class Detector:
     @classmethod
     def delete_historical_models(cls, model_root_path, comm_round):
         if not cls.preserve_historical_models:
-            filelist = [f for f in os.listdir(model_root_path) if not f.endswith(f'comm_{comm_round}.h5') and not f.endswith(f'comm_{comm_round-1}.h5')]
-            for f in filelist:
-                os.remove(os.path.join(model_root_path, f))
+            filelist = [f for f in os.listdir(model_root_path)]
+            filelist = sorted(filelist, key = lambda x: int(x.split('.')[0].split('_')[1]))
+            if len(filelist) > cls.num_models_to_delete:
+                for f in filelist[:len(filelist) - cls.num_models_to_delete]:
+                    os.remove(os.path.join(model_root_path, f))
     
     def get_dataset(self):
         return self._dataset

@@ -186,6 +186,7 @@ else:
 # init vars
 get_error = vars()[f'get_{config_vars["error_type"]}']
 Detector.preserve_historical_models = config_vars['preserve_historical_models']
+Detector.num_models_to_delete = config_vars['save_frequency'] + 1
 
 ''' init FedAvg vars '''
 INPUT_LENGTH = config_vars['input_length']
