@@ -71,10 +71,17 @@ args = parser.parse_args()
 args = args.__dict__
 ''' Parse command line arguments '''
 
+stand_alone_model_path = 'stand_alone'
+naive_fl_local_model_path = 'naive_fl_local'
+naive_fl_global_model_path = 'naive_fl_global'
+fav_neighbors_fl_local_model_path = 'fav_neighbors_fl_local'
+fav_neighbors_fl_agg_model_path = 'fav_neighbors_fl_agg'
+
 print("Preparing - i.e., create detector objects, init models, load data, etc,.\nThis may take a few minutes...")
 # determine if resume training
 if args['resume_path']:
     logs_dirpath = args['resume_path']
+    Detector.logs_dirpath = logs_dirpath
     # load saved variables
     with open(f"{logs_dirpath}/config_vars.pkl", 'rb') as f:
         # overwrite all args
@@ -93,11 +100,6 @@ if args['resume_path']:
     individual_min_data_sample = config_vars["individual_min_data_sample"]
     detector_locations = config_vars["detector_locations"]
     
-    stand_alone_model_path = f'{logs_dirpath}/stand_alone'
-    naive_fl_local_model_path = f'{logs_dirpath}/naive_fl_local'
-    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl_global'
-    fav_neighbors_fl_local_model_path = f'{logs_dirpath}/fav_neighbors_fl_local'
-    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl_agg'
     build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
 else:
     ''' logistics '''
@@ -118,6 +120,7 @@ else:
     date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
     logs_dirpath = f"{args['logs_base_folder']}/{date_time}_{args['model']}_input_{args['input_length']}_mds_{args['max_data_size']}_epoch_{args['epochs']}"
     os.makedirs(logs_dirpath, exist_ok=True)
+    Detector.logs_dirpath = logs_dirpath
     
     ''' create detector object and load data for each detector '''
     whole_data_record = {} # to calculate scaler
@@ -151,22 +154,17 @@ else:
         detector.assign_neighbors(list_of_detectors)
     
     ''' detector init models '''
-    stand_alone_model_path = f'{logs_dirpath}/stand_alone'
-    naive_fl_local_model_path = f'{logs_dirpath}/naive_fl_local'
-    naive_fl_global_model_path = f'{logs_dirpath}/naive_fl_global'
-    fav_neighbors_fl_local_model_path = f'{logs_dirpath}/fav_neighbors_fl_local'
-    fav_neighbors_fl_agg_model_path = f'{logs_dirpath}/fav_neighbors_fl_agg'
 
     build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
 
     global_model_0 = build_model([config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], 1])
     global_model_0.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
-    os.makedirs(naive_fl_global_model_path, exist_ok=True)
-    global_model_0_path = f'{naive_fl_global_model_path}/comm_0.h5'
+    os.makedirs(f'{Detector.logs_dirpath}/{naive_fl_global_model_path}', exist_ok=True)
+    global_model_0_path = f'{Detector.logs_dirpath}/{naive_fl_global_model_path}/comm_0.h5'
     global_model_0.save(global_model_0_path)
     # init models
     for detector_id, detector in list_of_detectors.items():
-        detector.init_models(global_model_0_path)
+        detector.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
         
     ''' init prediction records and fav_neighbor records'''
     detector_predicts = {}

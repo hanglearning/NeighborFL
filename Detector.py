@@ -7,6 +7,7 @@ from keras.models import load_model
 
 class Detector:
     preserve_historical_models = 0
+    logs_dirpath = None
     def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
         self.id = id
         self.loc = (latitude, longitude)
@@ -58,55 +59,56 @@ class Detector:
         self.fav_neighbors_fl_agg_model_path = global_model_0_path
     
     def get_stand_alone_model(self):
-        return load_model(self.stand_alone_model_path)
+        return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}')
     
     def get_naive_fl_local_model(self):
-        return load_model(self.naive_fl_local_model_path)
+        return load_model(f'{self.logs_dirpath}/{self.naive_fl_local_model_path}')
     
     def get_last_naive_fl_global_model(self):
-        return load_model(self.naive_fl_global_model_path)
+        return load_model(f'{self.logs_dirpath}/{self.naive_fl_global_model_path}')
     
     def get_fav_neighbors_fl_local_model(self):
-        return load_model(self.fav_neighbors_fl_local_model_path)
+        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}')
     
     def get_last_fav_neighbors_fl_agg_model(self):
-        return load_model(self.fav_neighbors_fl_agg_model_path)
+        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}')
         
     def update_and_save_stand_alone_model(self, new_model, comm_round, stand_alone_model_path):
-        os.makedirs(f'{stand_alone_model_path}/{self.id}', exist_ok=True)
+        os.makedirs(f'{self.logs_dirpath}/{stand_alone_model_path}/{self.id}', exist_ok=True)
         new_model_path = f'{stand_alone_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(new_model_path)
+        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
         self.stand_alone_model_path = new_model_path
-        self.delete_historical_models(f'{stand_alone_model_path}/{self.id}', comm_round)
+        self.delete_historical_models(f'{self.logs_dirpath}/{stand_alone_model_path}/{self.id}', comm_round)
     
     def update_and_save_naive_fl_local_model(self, new_model, comm_round, naive_fl_local_model_path):
-        os.makedirs(f'{naive_fl_local_model_path}/{self.id}', exist_ok=True)
+        os.makedirs(f'{self.logs_dirpath}/{naive_fl_local_model_path}/{self.id}', exist_ok=True)
         new_model_path = f'{naive_fl_local_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(new_model_path)
+        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
         self.naive_fl_local_model_path = new_model_path
-        self.delete_historical_models(f'{naive_fl_local_model_path}/{self.id}', comm_round)
+        self.delete_historical_models(f'{self.logs_dirpath}/{naive_fl_local_model_path}/{self.id}', comm_round)
+        
+    @classmethod
+    def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
+        new_model.save(f'{cls.logs_dirpath}/{naive_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{cls.logs_dirpath}/{naive_fl_global_model_path}', comm_round)
     
     def update_fl_global_model(self, comm_round, naive_fl_global_model_path):
         self.naive_fl_global_model_path = f'{naive_fl_global_model_path}/comm_{comm_round}.h5'
         
     def update_and_save_fav_neighbors_fl_local_model(self, new_model, comm_round, fav_neighbors_fl_local_model_path):
-        os.makedirs(f'{fav_neighbors_fl_local_model_path}/{self.id}', exist_ok=True)
+        os.makedirs(f'{self.logs_dirpath}/{fav_neighbors_fl_local_model_path}/{self.id}', exist_ok=True)
         new_model_path = f'{fav_neighbors_fl_local_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(new_model_path)
+        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
         self.fav_neighbors_fl_local_model_path = new_model_path
-        self.delete_historical_models(f'{fav_neighbors_fl_local_model_path}/{self.id}', comm_round)
+        self.delete_historical_models(f'{self.logs_dirpath}/{fav_neighbors_fl_local_model_path}/{self.id}', comm_round)
         
-    @classmethod
-    def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
-        new_model.save(f'{naive_fl_global_model_path}/comm_{comm_round}.h5')
-        cls.delete_historical_models(f'{naive_fl_global_model_path}', comm_round)
         
     def update_and_save_fav_neighbors_fl_agg_model(self, new_model, comm_round, fav_neighbors_fl_agg_model_path):
-        os.makedirs(f'{fav_neighbors_fl_agg_model_path}/{self.id}', exist_ok=True)
+        os.makedirs(f'{self.logs_dirpath}/{fav_neighbors_fl_agg_model_path}/{self.id}', exist_ok=True)
         new_model_path = f'{fav_neighbors_fl_agg_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(new_model_path)
+        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
         self.fav_neighbors_fl_agg_model_path = new_model_path
-        self.delete_historical_models(f'{fav_neighbors_fl_agg_model_path}/{self.id}', comm_round)
+        self.delete_historical_models(f'{self.logs_dirpath}/{fav_neighbors_fl_agg_model_path}/{self.id}', comm_round)
     
     @classmethod
     def delete_historical_models(cls, model_root_path, comm_round):

@@ -209,7 +209,7 @@ def calculate_errors(plot_data):
     for detector_id, prediction_method in plot_data.items():
         error_values[detector_id] = {}
         for model, predicts in prediction_method.items():
-            if model != 'true' and "global" in model:
+            if model != 'true':
                 error_values[detector_id][model] = {}
                 error_values[detector_id][model]['MAE'] = get_MAE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
                 error_values[detector_id][model]['MSE'] = get_MSE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
