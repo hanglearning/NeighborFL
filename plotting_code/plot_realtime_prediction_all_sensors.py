@@ -113,40 +113,22 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     ax.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
     true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
+
+    ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
+
+    ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
     
-    if args['version'] == 'c':
-        
-        ''' CCGrid Version '''
+    ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+
+    stand_alone_curve = mlines.Line2D([], [], color='orange', label="STAND")
+    naive_fl_curve = mlines.Line2D([], [], color='lime', label="FEDAVG")
+    neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
     
-        ax.plot(range(plotting_range), plot_data[detector_id]['global_onestep']['y'][-plotting_range:], label='global_onestep', color='lime')
+    ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
+    fig.set_size_inches(8, 2)
+    plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
+    # plt.show()
 
-        ax.plot(range(plotting_range), plot_data[detector_id]['baseline_onestep']['y'][-plotting_range:], label='baseline_onestep', color='orange')
-
-        baseline_curve = mlines.Line2D([], [], color='orange', label="BASE")
-        global_curve = mlines.Line2D([], [], color='lime', label="FED")
-        
-        ax.legend(handles=[true_curve,baseline_curve, global_curve], loc='best', prop={'size': 10})
-        fig.set_size_inches(8, 2)
-        plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
-        # plt.show()
-    
-    else:    
-        ''' Journal Extension '''
-        
-        ax.plot(range(plotting_range), plot_data[detector_id]['global_onestep']['y'][-plotting_range:], label='global_onestep', color='lime')
-
-        ax.plot(range(plotting_range), plot_data[detector_id]['global_chained']['y'][-plotting_range:], label='global_chained', color='orange')
-        
-        ax.plot(range(plotting_range), plot_data[detector_id]['global_multi']['y'][-plotting_range:], label='global_multi', color='darkgreen')
-
-        global_onestep_curve = mlines.Line2D([], [], color='lime', label="ONE")
-        global_chained_curve = mlines.Line2D([], [], color='orange', label="CHAINED")
-        global_multi_curve = mlines.Line2D([], [], color='darkgreen', label="MULTI")
-        
-        ax.legend(handles=[true_curve,global_onestep_curve, global_chained_curve, global_multi_curve], loc='best', prop={'size': 10})
-        fig.set_size_inches(8, 2)
-        plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
-        # plt.show()
     
     # draw subplots
     # default - draw 2 row and 3 col = 6 plots
@@ -169,7 +151,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     
     my_xticks = [0, plotting_range//2, plotting_range-2]
-    my_xticklabels = [config_vars["last_round"] - plot_last_comm_rounds + 1, config_vars["last_round"] - plot_last_comm_rounds//2 + 1, config_vars["last_round"]]
+    my_xticklabels = [config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds + 1, config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds//2 + 1, config_vars["resume_comm_round"] - 1]
     
     
     detector_lists.remove(args['representative'])
@@ -201,31 +183,18 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         subplots.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
         true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
         
-        if args['version'] == 'c':
-            ''' CCGrid Version '''
-            subplots.plot(range(plotting_range), plot_data[detector_id]['global_onestep']['y'][-plotting_range:], label='global_onestep', color='lime')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
 
-            subplots.plot(range(plotting_range), plot_data[detector_id]['baseline_onestep']['y'][-plotting_range:], label='baseline_onestep', color='orange')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
         
-            baseline_curve = mlines.Line2D([], [], color='orange', label="BASE")
-            global_curve = mlines.Line2D([], [], color='lime', label="FED")
-            
-            subplots.legend(handles=[true_curve,baseline_curve, global_curve], loc='best', prop={'size': 10})
-            
-        else:        
-            ''' Journal Extension '''
-            
-            subplots.plot(range(plotting_range), plot_data[detector_id]['global_onestep']['y'][-plotting_range:], label='global_onestep', color='lime')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+    
+        stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
+        naive_fl_curve = mlines.Line2D([], [], color='lime', label="FED")
+        neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
 
-            subplots.plot(range(plotting_range), plot_data[detector_id]['global_chained']['y'][-plotting_range:], label='global_chained', color='orange')
-            
-            subplots.plot(range(plotting_range), plot_data[detector_id]['global_multi']['y'][-plotting_range:], label='global_multi', color='darkgreen')
+        subplots.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
         
-            global_onestep_curve = mlines.Line2D([], [], color='lime', label="ONE")
-            global_chained_curve = mlines.Line2D([], [], color='orange', label="CHAINED")
-            global_multi_curve = mlines.Line2D([], [], color='darkgreen', label="MULTI")
-            
-            subplots.legend(handles=[true_curve,global_onestep_curve, global_chained_curve, global_multi_curve], loc='best', prop={'size': 10})
             
         
         
