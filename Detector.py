@@ -8,7 +8,7 @@ from tensorflow.keras.models import load_model
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
-    def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1, epsilon=0.2) -> None:
+    def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
         self.id = id
         self.loc = (latitude, longitude)
         self.direction = direction
@@ -33,7 +33,7 @@ class Detector:
         self.neighbors_to_rep_score = {}
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
-        self.epsilon = epsilon # if model itself is worse than last comm_round, roll a dice and kick a neighbor with the lowest reputation score, which is accumulated by error diffence. The larger the neighbor's model brings down the error, the better the neighbor
+        self.neighbor_fl_error_records = []
             
     def assign_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():

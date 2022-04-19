@@ -62,10 +62,14 @@ parser.add_argument('-r', '--radius', type=float, default=None, help='only treat
 parser.add_argument('-k', '--k', type=float, default=None, help='maximum number of fav_neighbors. radius and k can be used together, but radius has the priority')
 parser.add_argument('-et', '--error_type', type=str, default="MAE", help='the error type to evaluate potential neighbors')
 parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to try in each comm_round')
-parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='detector has a probability to kick out worst neighbors to explore new neighbors')
-parser.add_argument('-kn', '--kick_num', type=int, default=2, help='two strategies: 1 - kick 1 worst detector, 2 - kick 25% of the worst detectors')
-parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='0 - never kick, 1 - kick by worst reputation, 2 - kick randomly')
-parser.add_argument('-ah', '--add_heuristic', type=int, default="1", help='heuristic to add fav neighbors: 1 - add by distance from close to far, 2 - add randomly')
+parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heuristic to add fav neighbors: 1 - add by distance from close to far, 2 - add randomly')
+# arguments for fav_neighbor kicking
+parser.add_argument('-kt', '--kick_trigger', type=int, default=2, help='to trigger a kick: 0 - never kick; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -kr')
+parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -kt 1, detector has a probability to kick out worst neighbors to explore new neighbors')
+parser.add_argument('-kr', '--kick_rounds', type=int, default=3, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for this number of rounds")
+parser.add_argument('-kn', '--kick_num', type=int, default=None, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
+parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='this number defines how many percent of of neighboring detecotors to kick having the worst reputation.  Default to 0.25.  Either this or -kn has to be specified, if both specified, randomly chosen')
+parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -103,9 +107,13 @@ if args['resume_path']:
     build_model = build_lstm if config_vars["model"] == 'lstm' else build_gru
 else:
     ''' logistics '''
-    # save command line arguments
     config_vars = args
     STARTING_COMM_ROUND = 1
+    
+    # assgin -kp and -ks if both not specified
+    if not config_vars["kick_percent"] and not config_vars["kick_num"]:
+        config_vars["kick_percent"] = 0.25
+        config_vars["kick_num"] = 1
     
     # read in detector file paths
     all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
@@ -141,7 +149,7 @@ else:
         print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(list_of_detectors.keys())})')
         whole_data_record[detector_id] = whole_data
         # create a detector object
-        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'], epsilon=config_vars['epsilon'])
+        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
         list_of_detectors[detector_id] = detector
     config_vars["individual_min_data_sample"] = individual_min_data_sample
     
@@ -194,6 +202,8 @@ else:
         f.write("\n\nAll arguments used -\n")
         for arg_name, arg in args.items():
             f.write(f'\n--{arg_name} {arg}')
+        f.write("\n\nNOTE: This file records the original command line arguments while executing the program the 1st time.")
+        f.write("\nPlease refer to the args saved in config_vars.pkl for the latest used env vars.")
 
 # init vars
 get_error = vars()[f'get_{config_vars["error_type"]}']
@@ -323,6 +333,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         if detector.tried_neighbors:
             print(f"{detector_id} now evaluating new potential fav neighbors' ({set(d.id for d in detector.tried_neighbors)}) models.")
             error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)
+            detector.neighbor_fl_error_records.append(error_without_new_neighbors)
             error_with_new_neighbors = get_error(y_true, detector.to_compare_fav_neighbors_fl_predictions)
             error_diff = error_without_new_neighbors - error_with_new_neighbors
             for neighbor in detector.tried_neighbors:
@@ -398,33 +409,44 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             detector.neighbors = random.shuffle(detector.neighbors)
         
         ''' kick some fav neighbors by rolling a dice and strategy '''
-        if config_vars["kick_strategy"]:
-            if random.random() <= detector.epsilon:
-                kick_num = 1
-                if config_vars["kick_num"] == 2:
-                    kick_num = round(len(detector.fav_neighbors) * 0.25)
-                # kick 
-                if config_vars["kick_strategy"] == 1:
-                    # kick by lowest reputation
-                    rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
-                    for i in range(len(rep_tuples)):
-                        if kick_num > 0:
-                            to_kick_id = rep_tuples[i][0]
-                            if list_of_detectors[to_kick_id] in detector.fav_neighbors:
-                                detector.fav_neighbors.remove(list_of_detectors[to_kick_id])
-                                print(f"{detector_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
-                                kick_num -= 1
-                        else:
-                            break
-                else:
-                    # kick randomly
-                    for i in range(len(rep_tuples)):
-                        if kick_num > 0:
-                            kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
-                            print(f"{detector_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
+        if_kick = False
+        if config_vars["kick_trigger"] == 1 and random.random() <= config_vars['epsilon']:
+            if_kick = True
+        if config_vars["kick_trigger"] == 2 and comm_round > config_vars['kick_rounds']:
+            last_rounds_error = detector.neighbor_fl_error_records[-config_vars['kick_rounds']:]
+            if all(x<y for x, y in zip(last_rounds_error, last_rounds_error[1:])):
+                if_kick = True
+        # kick 
+        if if_kick:
+            kick_nums = []
+            if config_vars["kick_percent"]:
+                kick_nums.append(round(len(detector.fav_neighbors) * config_vars["kick_percent"]))
+            if config_vars["kick_num"]:
+                kick_nums.append(config_vars["kick_num"])
+            kick_num = random.choice(kick_nums)
+            rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
+            if config_vars["kick_strategy"] == 1:
+                # kick by lowest reputation
+                for i in range(len(rep_tuples)):
+                    if kick_num > 0:
+                        to_kick_id = rep_tuples[i][0]
+                        if list_of_detectors[to_kick_id] in detector.fav_neighbors:
+                            detector.fav_neighbors.remove(list_of_detectors[to_kick_id])
+                            print(f"{detector_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                             kick_num -= 1
-                        else:
-                            break
+                    else:
+                        break
+            elif config_vars["kick_strategy"] == 2:
+                # kick randomly
+                for i in range(len(rep_tuples)):
+                    if kick_num > 0:
+                        kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
+                        print(f"{detector_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
+                        kick_num -= 1
+                    else:
+                        break
+                
+        # at the end of FL for loop
         detecotr_iter += 1
     
     print(f"Saving progress for comm_round {comm_round}...")
