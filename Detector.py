@@ -3,7 +3,7 @@ from copy import deepcopy
 import random
 import os
 from haversine import haversine, Unit
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 
 class Detector:
     preserve_historical_models = 0
@@ -59,19 +59,19 @@ class Detector:
         self.fav_neighbors_fl_agg_model_path = global_model_0_path
     
     def get_stand_alone_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}')
+        return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)
     
     def get_naive_fl_local_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.naive_fl_local_model_path}')
+        return load_model(f'{self.logs_dirpath}/{self.naive_fl_local_model_path}', compile = False)
     
     def get_last_naive_fl_global_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.naive_fl_global_model_path}')
+        return load_model(f'{self.logs_dirpath}/{self.naive_fl_global_model_path}', compile = False)
     
     def get_fav_neighbors_fl_local_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}')
+        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}', compile = False)
     
     def get_last_fav_neighbors_fl_agg_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}')
+        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}', compile = False)
         
     def update_and_save_stand_alone_model(self, new_model, comm_round, stand_alone_model_path):
         os.makedirs(f'{self.logs_dirpath}/{stand_alone_model_path}/{self.id}', exist_ok=True)

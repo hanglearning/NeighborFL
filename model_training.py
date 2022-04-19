@@ -31,7 +31,7 @@ def train_model(model, X_train, y_train, batch, epochs):
         this_sensor_dirpath: specify directory to store related records for this sensor
         config: Dict, parameter for train.
     """
-    #model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
+    model.compile(loss="mse", optimizer="rmsprop", metrics=['mape'])
     hist = model.fit(
         X_train, y_train,
         batch_size=batch,

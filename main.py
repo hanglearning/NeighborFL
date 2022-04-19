@@ -408,7 +408,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     # kick by lowest reputation
                     rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
                     for i in range(kick_num):
-                        if rep_tuples[i][0] in detector.fav_neighbors:
+                        if list_of_detectors[rep_tuples[i][0]] in detector.fav_neighbors:
                             detector.fav_neighbors.remove(list_of_detectors[id])
                             print(f"{detector_id} kicks out {id}")
                 else:
