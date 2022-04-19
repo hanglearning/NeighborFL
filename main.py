@@ -408,14 +408,15 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     # kick by lowest reputation
                     rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
                     for i in range(kick_num):
-                        if list_of_detectors[rep_tuples[i][0]] in detector.fav_neighbors:
-                            detector.fav_neighbors.remove(list_of_detectors[id])
-                            print(f"{detector_id} kicks out {id}")
+                        to_kick_id = rep_tuples[i][0]
+                        if list_of_detectors[to_kick_id] in detector.fav_neighbors:
+                            detector.fav_neighbors.remove(list_of_detectors[to_kick_id])
+                            print(f"{detector_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                 else:
                     # kick randomly
                     for i in range(kick_num):
                         kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
-                        print(f"{detector_id} kicks out {kicked_neighbor.id}")
+                        print(f"{detector_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
         detecotr_iter += 1
     
     print(f"Saving progress for comm_round {comm_round}...")
