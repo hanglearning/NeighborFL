@@ -330,8 +330,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL"
         print('-' * len(print_text))
         print(print_text)
-        error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
-        detector.neighbor_fl_error_records.append(error_without_new_neighbors)
+        if comm_round > 1:
+            error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
+            detector.neighbor_fl_error_records.append(error_without_new_neighbors)
         if detector.tried_neighbors:
             print(f"{detector_id} now evaluating new potential fav neighbors' ({set(d.id for d in detector.tried_neighbors)}) models.")
             error_with_new_neighbors = get_error(y_true, detector.to_compare_fav_neighbors_fl_predictions)
