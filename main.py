@@ -341,7 +341,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 if error_diff > 0:
                     # tried neighbors are good
                     detector.fav_neighbors.append(neighbor)
-                    print(f"{neighbor.id} added to {detector.id}'s fav neighbors!")
+                    print(f"{detector.id} added {neighbor.id} to its fav neighbors!")
                 else:
                     # tried neighbors are bad
                     print(f"{detector.id} SKIPPED adding {neighbor.id} to its fav neighbors.")
