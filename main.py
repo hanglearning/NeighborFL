@@ -414,10 +414,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         if config_vars["kick_trigger"] == 1 and random.random() <= config_vars['epsilon']:
             if_kick = True
         if config_vars["kick_trigger"] == 2 and comm_round > config_vars['kick_rounds']:
-            last_rounds_error = detector.neighbor_fl_error_records[-config_vars['kick_rounds']:]
+            last_rounds_error = detector.neighbor_fl_error_records[-(config_vars['kick_rounds'] + 1):]
             if all(x<y for x, y in zip(last_rounds_error, last_rounds_error[1:])):
                 if_kick = True
-        # kick 
+        # kick
         if if_kick:
             kick_nums = []
             if config_vars["kick_percent"]:
