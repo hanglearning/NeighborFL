@@ -15,8 +15,6 @@ from keras.callbacks import EarlyStopping
 import warnings
 warnings.filterwarnings("ignore")
 from keras.models import load_model
-from build_lstm import build_lstm
-from build_gru import build_gru
 import os
 
 def train_model(model, X_train, y_train, batch, epochs):

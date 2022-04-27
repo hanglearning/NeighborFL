@@ -40,7 +40,7 @@ args = args.__dict__
 
 ''' Variables Required '''
 logs_dirpath = args["logs_dirpath"]
-with open(f"{logs_dirpath}/config_vars.pkl", 'rb') as f:
+with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
 		config_vars = pickle.load(f)
 input_length = config_vars["input_length"]
 plot_last_comm_rounds = args["plot_last_comm_rounds"] # to plot last plot_last_comm_rounds hours
@@ -222,7 +222,7 @@ def calculate_errors(plot_data):
             file.write(tabulate(error_values_df.round(2), headers='keys', tablefmt='psql'))
             file.write('\n')
     
-with open(f"{logs_dirpath}/all_detector_predicts.pkl", 'rb') as f:
+with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
 detector_lists, plot_data = make_plot_data(detector_predicts)
 # plot_and_save(detector_lists, plot_data)

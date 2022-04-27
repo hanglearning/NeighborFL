@@ -24,7 +24,8 @@ class Detector:
         self.fav_neighbors_fl_local_model_path = None
         self.fav_neighbors_fl_agg_model_path = None # aggregated
         self.fav_neighbors_fl_predictions = None
-        self.to_compare_fav_neighbors_fl_predictions = None
+        self.tried_fav_neighbors_fl_agg_model_path = None # aggregated
+        self.tried_fav_neighbors_fl_predictions = None
         self.neighbors = [] # candidate neighbors
         self.fav_neighbors = []
         self.tried_neighbors = []
@@ -72,20 +73,12 @@ class Detector:
     
     def get_last_fav_neighbors_fl_agg_model(self):
         return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}', compile = False)
-        
-    def update_and_save_stand_alone_model(self, new_model, comm_round, stand_alone_model_path):
-        os.makedirs(f'{self.logs_dirpath}/{stand_alone_model_path}/{self.id}', exist_ok=True)
-        new_model_path = f'{stand_alone_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
-        self.stand_alone_model_path = new_model_path
-        self.delete_historical_models(f'{self.logs_dirpath}/{stand_alone_model_path}/{self.id}', comm_round)
     
-    def update_and_save_naive_fl_local_model(self, new_model, comm_round, naive_fl_local_model_path):
-        os.makedirs(f'{self.logs_dirpath}/{naive_fl_local_model_path}/{self.id}', exist_ok=True)
-        new_model_path = f'{naive_fl_local_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
-        self.naive_fl_local_model_path = new_model_path
-        self.delete_historical_models(f'{self.logs_dirpath}/{naive_fl_local_model_path}/{self.id}', comm_round)
+    def get_tried_fav_neighbors_fl_agg_model(self):
+        model_path = f'{self.logs_dirpath}/{self.tried_fav_neighbors_fl_agg_model_path}'
+        if not os.path.isfile(model_path):
+            return None
+        return load_model(model_path, compile = False)
         
     @classmethod
     def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
@@ -95,20 +88,21 @@ class Detector:
     def update_fl_global_model(self, comm_round, naive_fl_global_model_path):
         self.naive_fl_global_model_path = f'{naive_fl_global_model_path}/comm_{comm_round}.h5'
         
-    def update_and_save_fav_neighbors_fl_local_model(self, new_model, comm_round, fav_neighbors_fl_local_model_path):
-        os.makedirs(f'{self.logs_dirpath}/{fav_neighbors_fl_local_model_path}/{self.id}', exist_ok=True)
-        new_model_path = f'{fav_neighbors_fl_local_model_path}/{self.id}/comm_{comm_round}.h5'
+    def update_and_save_model(self, new_model, comm_round, model_folder_name):
+        os.makedirs(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', exist_ok=True)
+        new_model_path = f'{model_folder_name}/{self.id}/comm_{comm_round}.h5'
         new_model.save(f'{self.logs_dirpath}/{new_model_path}')
-        self.fav_neighbors_fl_local_model_path = new_model_path
-        self.delete_historical_models(f'{self.logs_dirpath}/{fav_neighbors_fl_local_model_path}/{self.id}', comm_round)
-        
-        
-    def update_and_save_fav_neighbors_fl_agg_model(self, new_model, comm_round, fav_neighbors_fl_agg_model_path):
-        os.makedirs(f'{self.logs_dirpath}/{fav_neighbors_fl_agg_model_path}/{self.id}', exist_ok=True)
-        new_model_path = f'{fav_neighbors_fl_agg_model_path}/{self.id}/comm_{comm_round}.h5'
-        new_model.save(f'{self.logs_dirpath}/{new_model_path}')
-        self.fav_neighbors_fl_agg_model_path = new_model_path
-        self.delete_historical_models(f'{self.logs_dirpath}/{fav_neighbors_fl_agg_model_path}/{self.id}', comm_round)
+        if model_folder_name == 'stand_alone': 
+            self.stand_alone_model_path = new_model_path
+        elif model_folder_name == 'naive_fl_local': 
+            self.naive_fl_local_model_path = new_model_path
+        elif model_folder_name == 'fav_neighbors_fl_local': 
+            self.fav_neighbors_fl_local_model_path = new_model_path
+        elif model_folder_name == 'fav_neighbors_fl_agg': 
+            self.fav_neighbors_fl_agg_model_path = new_model_path
+        elif model_folder_name == 'tried_fav_neighbors_fl_agg': 
+            self.tried_fav_neighbors_fl_agg_model_path = new_model_path
+        self.delete_historical_models(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', comm_round)
     
     @classmethod
     def delete_historical_models(cls, model_root_path, comm_round):
