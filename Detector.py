@@ -12,7 +12,10 @@ import pickle
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
+    # brute_force
     dp_brute_force_models = {}
+    brute_force_combo_error_records = {}
+    brute_force_best_neighbors = {}
     def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
         self.id = id
         self.loc = (latitude, longitude)
@@ -45,8 +48,6 @@ class Detector:
         self.brute_force_fl_agg_model_path = None
         self.brute_force_neighbor_combinations = None
         self.brute_force_all_models_predictions = {}
-        self.brute_force_combo_error_records = []
-        self.brute_force_best_neighbors = []
         self.neighbor_to_distance = {}
         
     def assign_neighbors(self, list_of_detectors):
@@ -105,17 +106,21 @@ class Detector:
         combo_pred_tuples = [(combo, pred) for combo, pred in sorted(all_combos_error_records.items(), key=lambda x: x[1])]
         # add distance order
         combo_pred_tuples_with_distance_order = [([(neighbor, self.neighbor_to_distance[neighbor]) for neighbor in combo_pred_tuple[0]], combo_pred_tuple[1]) for combo_pred_tuple in combo_pred_tuples]
-        self.brute_force_combo_error_records.append(combo_pred_tuples_with_distance_order)
+        
         # recreate best fav model
         best_combo = combo_pred_tuples_with_distance_order[0][0]
         best_pred = self.brute_force_all_models_predictions[combo_pred_tuples[0][0]]
-        self.brute_force_best_neighbors.append(best_combo)
-        os.makedirs(f'{self.logs_dirpath}/check_point/combo_error_records/', exist_ok=True)
-        os.makedirs(f'{self.logs_dirpath}/check_point/best_combo_records/', exist_ok=True)
-        with open(f'{self.logs_dirpath}/check_point/combo_error_records/{self.id}_combo_error.pkl', 'wb') as f:
-            pickle.dump(self.brute_force_combo_error_records, f)
-        with open(f'{self.logs_dirpath}/check_point/best_combo_records/{self.id}_best_combo.pkl', 'wb') as f:
-            pickle.dump(self.brute_force_best_neighbors, f)
+        
+        if self.id in self.brute_force_combo_error_records:
+            self.brute_force_combo_error_records[self.id].append(combo_pred_tuples_with_distance_order)
+        else:
+            self.brute_force_combo_error_records[self.id] = [combo_pred_tuples_with_distance_order]
+            
+        if self.id in self.brute_force_best_neighbors:
+            self.brute_force_best_neighbors[self.id].append(best_combo)
+        else:
+            self.brute_force_best_neighbors[self.id] = [best_combo]
+        
         model_weights = [self.get_last_brute_force_fl_local_model(comm_round).get_weights()]
         temp_model = create_model(model_units, model_configs)
         for best_neighbor_iter in best_combo:

@@ -518,6 +518,13 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     fav_neighbors_record_saved_path = f'{logs_dirpath}/check_point/fav_neighbors.pkl'
     with open(fav_neighbors_record_saved_path, 'wb') as f:
         pickle.dump(detector_fav_neighbors, f)
+        
+    # brute-force
+    with open(f'{Detector.logs_dirpath}/check_point/brute_force_combo_error_records.pkl', 'wb') as f:
+        pickle.dump(Detector.brute_force_combo_error_records, f)
+    
+    with open(f'{Detector.logs_dirpath}/check_point/brute_force_best_neighbors.pkl', 'wb') as f:
+        pickle.dump(Detector.brute_force_best_neighbors, f)
     
     print("Saving Resume Params...")
     config_vars["resume_comm_round"] = comm_round + 1
