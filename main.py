@@ -360,9 +360,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         
         ''' Brute-force Training '''
         if config_vars["brute_force_fl"]:
-            chosen_model = detector.get_brute_force_fl_agg_model()
             print(f"{detector_id} training brute_force model.. (4/4)")
-            if comm_round > 1:
+            if comm_round == 1:
+                chosen_model = detector.get_brute_force_fl_agg_model()
+            else:
                 chosen_model, best_pred = detector.get_best_brute_force_model(create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round)
                 detector_predicts[detector_id]['brute_force'].append((comm_round, best_pred))
             new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
@@ -381,24 +382,24 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     if config_vars["naive_fl"]:
         # create naive_fl model from all naive_fl_local models
         print("Predicting on naive fl model")
-        new_naive_fl_global_model = create_model(model_units, model_configs)
+        naive_fl_global_model = create_model(model_units, model_configs)
         naive_fl_local_models_weights = []
         for detector_id, detector in list_of_detectors.items():
             naive_fl_local_models_weights.append(detector.get_naive_fl_local_model().get_weights())
-        new_naive_fl_global_model.set_weights(np.mean(naive_fl_local_models_weights, axis=0))
-        # save new_naive_fl_global_model
-        Detector.save_fl_global_model(new_naive_fl_global_model, comm_round, naive_fl_global_model_path)
+        naive_fl_global_model.set_weights(np.mean(naive_fl_local_models_weights, axis=0))
+        # save naive_fl_global_model
+        Detector.save_fl_global_model(naive_fl_global_model, comm_round, naive_fl_global_model_path)
     
         detecotr_iter = 1
         for detector_id, detector in list_of_detectors.items():
-            # update new_naive_fl_global_model
+            # update naive_fl_global_model
             detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
             # do prediction
-            print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
-            new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
-            new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by naive_fl_global_model")
+            naive_fl_global_model_predictions = naive_fl_global_model.predict(detector.get_X_test())
+            naive_fl_global_model_predictions = scaler.inverse_transform(naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
             detector
-            detector_predicts[detector_id]['naive_fl'].append((comm_round,new_naive_fl_global_model_predictions))
+            detector_predicts[detector_id]['naive_fl'].append((comm_round,naive_fl_global_model_predictions))
             detecotr_iter += 1
         
     ''' Simulate brute_force FL FedAvg '''
