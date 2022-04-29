@@ -9,6 +9,19 @@ from itertools import chain, combinations
 import numpy as np
 import pickle
 
+from time import time
+
+def timer_func(func):
+    # This function shows the execution time of 
+    # the function object passed
+    def wrap_func(*args, **kwargs):
+        t1 = time()
+        result = func(*args, **kwargs)
+        t2 = time()
+        print(f'Function {func.__name__!r} executed in {(t2-t1):.4f}s')
+        return result
+    return wrap_func
+
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
@@ -78,7 +91,8 @@ class Detector:
         # https://stackoverflow.com/questions/1482308/how-to-get-all-subsets-of-a-set-powerset
         s = list(detector_ids)
         self.brute_force_neighbor_combinations = list(chain.from_iterable(combinations(s, r) for r in range(len(s)+1)))
-        
+    
+    @timer_func
     def get_all_possible_models_predictions(self, create_model, model_units, model_configs, list_of_detectors):
         for combo in self.brute_force_neighbor_combinations:
             detectors_in_this_model = set([self.id])
@@ -98,6 +112,7 @@ class Detector:
             self.brute_force_all_models_predictions[combo] = temp_model.predict(self.get_X_test())
         # return self.brute_force_all_models_predictions
     
+    @timer_func
     def get_best_brute_force_model(self, create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round):
         all_combos_error_records = {}
         for combo, pred in self.brute_force_all_models_predictions.items():
