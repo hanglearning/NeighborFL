@@ -114,21 +114,21 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     ax.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
     true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
 
-    # ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
+    ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
 
-    # ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
+    ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
     
-    # ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+    ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
     
-    ax.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='red')
+    ax.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
 
-    # stand_alone_curve = mlines.Line2D([], [], color='orange', label="STAND")
-    # naive_fl_curve = mlines.Line2D([], [], color='lime', label="FEDAVG")
-    # neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
-    brute_force_fl_curve = mlines.Line2D([], [], color='red', label="brute_force")
+    stand_alone_curve = mlines.Line2D([], [], color='orange', label="STAND")
+    naive_fl_curve = mlines.Line2D([], [], color='lime', label="FEDAVG")
+    neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+    brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
     
-    # ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
-    ax.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
+    ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
+    # ax.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
     fig.set_size_inches(8, 2)
     plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
     # plt.show()
@@ -187,23 +187,23 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         subplots.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
         true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
         
-        # subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
 
-        # subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
         
-        # subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='red')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
     
-        # stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
-        # naive_fl_curve = mlines.Line2D([], [], color='lime', label="FED")
-        # neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+        stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
+        naive_fl_curve = mlines.Line2D([], [], color='lime', label="FED")
+        neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
         
-        brute_force_fl_curve = mlines.Line2D([], [], color='red', label="brute_force")
+        brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
 
-        # subplots.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
+        subplots.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve, brute_force_fl_curve], loc='best', prop={'size': 10})
         
-        subplots.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
+        # subplots.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
         
             
         
@@ -219,8 +219,8 @@ def calculate_errors(plot_data):
     for detector_id, prediction_method in plot_data.items():
         error_values[detector_id] = {}
         for model, predicts in prediction_method.items():
-            # if model != 'true':
-            if model == 'brute_force':
+            if model != 'true':
+            # if model == 'brute_force':
                 error_values[detector_id][model] = {}
                 error_values[detector_id][model]['MAE'] = get_MAE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
                 error_values[detector_id][model]['MSE'] = get_MSE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
