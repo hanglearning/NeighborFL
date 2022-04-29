@@ -5,9 +5,14 @@ import os
 from haversine import haversine, Unit
 from tensorflow.keras.models import load_model
 
+from itertools import chain, combinations
+import numpy as np
+import pickle
+
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
+    dp_brute_force_models = {}
     def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
         self.id = id
         self.loc = (latitude, longitude)
@@ -35,7 +40,15 @@ class Detector:
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
         self.neighbor_fl_error_records = []
-            
+        # brute-force
+        self.brute_force_fl_local_model_path = None
+        self.brute_force_fl_agg_model_path = None
+        self.brute_force_neighbor_combinations = None
+        self.brute_force_all_models_predictions = {}
+        self.brute_force_combo_error_records = []
+        self.brute_force_best_neighbors = []
+        self.neighbor_to_distance = {}
+        
     def assign_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():
             if detector == self:
@@ -50,14 +63,71 @@ class Detector:
         if self.add_heuristic == 1:
             # add neighbors with close to far heuristic
             self.neighbors = sorted(self.neighbors, key = lambda x: x[1])
+            neighbor_order = 1
+            for neighbor in self.neighbors:
+                # brute-force helper
+                self.neighbor_to_distance[neighbor[0].id] = neighbor_order
+                neighbor_order += 1
         elif self.add_heuristic == 2:
             # add neighbors randomly
             self.neighbors = random.shuffle(self.neighbors)
             
+    def set_brute_force_neighbor_combinations(self, list_of_detectors):
+        detector_ids = [d for d in list(list_of_detectors.keys()) if d != self.id]
+        # https://stackoverflow.com/questions/1482308/how-to-get-all-subsets-of-a-set-powerset
+        s = list(detector_ids)
+        self.brute_force_neighbor_combinations = list(chain.from_iterable(combinations(s, r) for r in range(len(s)+1)))
+        
+    def get_all_possible_models_predictions(self, create_model, model_units, model_configs, list_of_detectors):
+        for combo in self.brute_force_neighbor_combinations:
+            detectors_in_this_model = set([self.id])
+            for neighbor in combo:
+                detectors_in_this_model.add(neighbor)
+            detectors_in_this_model = frozenset(detectors_in_this_model)
+            if detectors_in_this_model in self.dp_brute_force_models:
+                temp_model = self.dp_brute_force_models[detectors_in_this_model]
+            else:
+                temp_model = create_model(model_units, model_configs)
+                model_weights = [self.get_brute_force_fl_local_model().get_weights()] 
+                for neighbor in combo:
+                    model_weights.append(list_of_detectors[neighbor].get_brute_force_fl_local_model().get_weights())
+                temp_model.set_weights(np.mean(model_weights, axis=0))
+                # use dp_brute_force_models to record model for other detectors to speed up execution
+                self.dp_brute_force_models[frozenset(detectors_in_this_model)] = temp_model
+            self.brute_force_all_models_predictions[combo] = temp_model.predict(self.get_X_test())
+        # return self.brute_force_all_models_predictions
+    
+    def get_best_brute_force_model(self, create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round):
+        all_combos_error_records = {}
+        for combo, pred in self.brute_force_all_models_predictions.items():
+            all_combos_error_records[combo] = get_error(y_true, pred)
+        # sort by errors
+        combo_pred_tuples = [(combo, pred) for combo, pred in sorted(all_combos_error_records.items(), key=lambda x: x[1])]
+        # add distance order
+        combo_pred_tuples_with_distance_order = [([(neighbor, self.neighbor_to_distance[neighbor]) for neighbor in combo_pred_tuple[0]], combo_pred_tuple[1]) for combo_pred_tuple in combo_pred_tuples]
+        self.brute_force_combo_error_records.append(combo_pred_tuples_with_distance_order)
+        # recreate best fav model
+        best_combo = combo_pred_tuples_with_distance_order[0][0]
+        best_pred = self.brute_force_all_models_predictions[combo_pred_tuples[0][0]]
+        self.brute_force_best_neighbors.append(best_combo)
+        os.makedirs(f'{self.logs_dirpath}/check_point/combo_error_records/', exist_ok=True)
+        os.makedirs(f'{self.logs_dirpath}/check_point/best_combo_records/', exist_ok=True)
+        with open(f'{self.logs_dirpath}/check_point/combo_error_records/{self.id}_combo_error.pkl', 'wb') as f:
+            pickle.dump(self.brute_force_combo_error_records, f)
+        with open(f'{self.logs_dirpath}/check_point/best_combo_records/{self.id}_best_combo.pkl', 'wb') as f:
+            pickle.dump(self.brute_force_best_neighbors, f)
+        model_weights = [self.get_last_brute_force_fl_local_model(comm_round).get_weights()]
+        temp_model = create_model(model_units, model_configs)
+        for best_neighbor_iter in best_combo:
+            model_weights.append(list_of_detectors[best_neighbor_iter[0]].get_last_brute_force_fl_local_model(comm_round).get_weights())
+        temp_model.set_weights(np.mean(model_weights, axis=0))
+        return temp_model, best_pred
+        
     def init_models(self, global_model_0_path):
         self.stand_alone_model_path = global_model_0_path
         self.naive_fl_global_model_path = global_model_0_path
         self.fav_neighbors_fl_agg_model_path = global_model_0_path
+        self.brute_force_fl_agg_model_path = global_model_0_path
     
     def get_stand_alone_model(self):
         return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)
@@ -70,6 +140,16 @@ class Detector:
     
     def get_fav_neighbors_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}', compile = False)
+    
+    # brute-force helper func
+    def get_brute_force_fl_local_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.brute_force_fl_local_model_path}', compile = False)
+    
+    def get_brute_force_fl_agg_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.brute_force_fl_agg_model_path}', compile = False)
+    
+    def get_last_brute_force_fl_local_model(self, comm_round):
+        return load_model(f'{self.logs_dirpath}/brute_force_fl_local/{self.id}/comm_{comm_round-1}.h5', compile = False)
     
     def get_last_fav_neighbors_fl_agg_model(self):
         return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}', compile = False)
@@ -102,6 +182,10 @@ class Detector:
             self.fav_neighbors_fl_agg_model_path = new_model_path
         elif model_folder_name == 'tried_fav_neighbors_fl_agg': 
             self.tried_fav_neighbors_fl_agg_model_path = new_model_path
+        elif model_folder_name == 'brute_force_fl_local': 
+            self.brute_force_fl_local_model_path = new_model_path
+        elif model_folder_name == 'brute_force_fl_agg': 
+            self.brute_force_fl_agg_model_path = new_model_path
         self.delete_historical_models(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', comm_round)
     
     @classmethod
