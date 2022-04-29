@@ -399,7 +399,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating brute_force FL"
         print('-' * len(print_text))
         print(print_text)
-        detector.get_all_possible_models_predictions(create_model, model_units, model_configs, list_of_detectors)
+        detector.get_all_possible_models_predictions(create_model, model_units, model_configs, list_of_detectors, scaler)
         detecotr_iter += 1
         
     if False:

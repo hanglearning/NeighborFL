@@ -93,7 +93,7 @@ class Detector:
         self.brute_force_neighbor_combinations = list(chain.from_iterable(combinations(s, r) for r in range(len(s)+1)))
     
     @timer_func
-    def get_all_possible_models_predictions(self, create_model, model_units, model_configs, list_of_detectors):
+    def get_all_possible_models_predictions(self, create_model, model_units, model_configs, list_of_detectors, scaler):
         for combo in self.brute_force_neighbor_combinations:
             detectors_in_this_model = set([self.id])
             for neighbor in combo:
@@ -109,7 +109,9 @@ class Detector:
                 temp_model.set_weights(np.mean(model_weights, axis=0))
                 # use dp_brute_force_models to record model for other detectors to speed up execution
                 self.dp_brute_force_models[frozenset(detectors_in_this_model)] = temp_model
-            self.brute_force_all_models_predictions[combo] = temp_model.predict(self.get_X_test())
+            temp_predictions = temp_model.predict(self.get_X_test())
+            temp_predictions = scaler.inverse_transform(temp_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            self.brute_force_all_models_predictions[combo] = temp_predictions
         # return self.brute_force_all_models_predictions
     
     @timer_func
