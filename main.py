@@ -76,6 +76,12 @@ parser.add_argument('-kn', '--kick_num', type=int, default=None, help='this numb
 parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='this number defines how many percent of of neighboring detecotors to kick having the worst reputation.  Default to 0.25.  Either this or -kn has to be specified, if both specified, randomly chosen')
 parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly')
 
+# arguments for which models to run
+parser.add_argument('--stand_alone', type=int, default=1, help='run stand_alone model')
+parser.add_argument('--naive_fl', type=int, default=1, help='run naive_fl model')
+parser.add_argument('--fav_neighbors_fl', type=int, default=1, help='run fav_neighbors_fl model')
+parser.add_argument('--brute_force_fl', type=int, default=1, help='run brute_force_fl model')
+
 args = parser.parse_args()
 args = args.__dict__
 ''' Parse command line arguments '''
@@ -305,17 +311,18 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detector_predicts[detector_id]['true'].append((comm_round,y_true))
         
         ''' Training '''
-        ''' Baselines'''
-        if False:
-            print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
+        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
+        if config_vars["stand_alone"]:
             # stand_alone model
             print(f"{detector_id} training stand_alone model.. (1/4)")
             new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, stand_alone_model_path)
+        if config_vars["naive_fl"]:
             # naive_fl local model
             print(f"{detector_id} training naive_fl local model.. (2/4)")
             new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
+        if config_vars["fav_neighbors_fl"]:
             ''' fav_neighbors_fl (core algorithm)'''
             # fav_neighbors_fl local model
             print(f"{detector_id} training fav_neighbors_fl local model.. (3/4)")
@@ -352,16 +359,17 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             print(f"{detector_id}'s current fav neighbors are {current_fav_neighbors}.")
         
         ''' Brute-force Training '''
-        chosen_model = detector.get_brute_force_fl_agg_model()
-        print(f"{detector_id} training brute_force model.. (4/4)")
-        if comm_round > 1:
-            chosen_model, best_pred = detector.get_best_brute_force_model(create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round)
-            detector_predicts[detector_id]['brute_force'].append((comm_round, best_pred))
-        new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
-        detector.update_and_save_model(new_model, comm_round, brute_force_fl_local_model_path)
+        if config_vars["brute_force_fl"]:
+            chosen_model = detector.get_brute_force_fl_agg_model()
+            print(f"{detector_id} training brute_force model.. (4/4)")
+            if comm_round > 1:
+                chosen_model, best_pred = detector.get_best_brute_force_model(create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round)
+                detector_predicts[detector_id]['brute_force'].append((comm_round, best_pred))
+            new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
+            detector.update_and_save_model(new_model, comm_round, brute_force_fl_local_model_path)
         
         ''' stand_alone model predictions '''
-        if False:
+        if config_vars["stand_alone"]:
             print(f"{detector_id} is now predicting by its stand_alone model...")
             stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
             stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
@@ -370,7 +378,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detecotr_iter += 1
         
     ''' Simulate Vanilla CCGrid FedAvg '''
-    if False:
+    if config_vars["naive_fl"]:
         # create naive_fl model from all naive_fl_local models
         print("Predicting on naive fl model")
         new_naive_fl_global_model = create_model(model_units, model_configs)
@@ -394,15 +402,16 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             detecotr_iter += 1
         
     ''' Simulate brute_force FL FedAvg '''
-    detecotr_iter = 1
-    for detector_id, detector in list_of_detectors.items():
-        print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating brute_force FL"
-        print('-' * len(print_text))
-        print(print_text)
-        detector.get_all_possible_models_predictions(create_model, model_units, model_configs, list_of_detectors, scaler)
-        detecotr_iter += 1
+    if config_vars["brute_force_fl"]:
+        detecotr_iter = 1
+        for detector_id, detector in list_of_detectors.items():
+            print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating brute_force FL"
+            print('-' * len(print_text))
+            print(print_text)
+            detector.get_all_possible_models_predictions(create_model, model_units, model_configs, list_of_detectors, scaler)
+            detecotr_iter += 1
         
-    if False:
+    if config_vars["fav_neighbors_fl"]:
         ''' Simulate fav_neighbor FL FedAvg '''    
         # determine if add new neighbor or not (core algorithm)
         detecotr_iter = 1
