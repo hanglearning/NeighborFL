@@ -365,7 +365,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 chosen_model = detector.get_brute_force_fl_agg_model()
             else:
                 chosen_model, best_pred = detector.get_best_brute_force_model(create_model, model_units, model_configs, get_error, y_true, list_of_detectors, comm_round)
-                detector_predicts[detector_id]['brute_force'].append((comm_round, best_pred))
+                detector_predicts[detector_id]['brute_force'].append((comm_round - 1, best_pred))
             new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, brute_force_fl_local_model_path)
         
