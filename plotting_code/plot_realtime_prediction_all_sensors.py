@@ -1,6 +1,7 @@
 import argparse
 import os
 import pickle
+from re import L
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from collections import deque
@@ -25,8 +26,8 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 # arguments for system vars
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_detector_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-pl', '--plot_last_comm_rounds', type=int, default=24, help='The number of the last comm rounds to plot. Will be a backup if starting_comm_round and ending_comm_round are not specified.')
-parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='epoch number to start plotting')
-parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='epoch number to end plotting')
+parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='round number to start plotting')
+parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='round number to end plotting')
 parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, default to 5 mins')
 parser.add_argument('-sd', '--single_plot_x_axis_density', type=int, default=1, help='label the 1 large plot x-axis by every this number of ticks')
 parser.add_argument('-md', '--multi_plot_x_axis_density', type=int, default=4, help='label the multi sub plots x-axis by every this number of ticks')
@@ -68,6 +69,9 @@ def make_plot_data(detector_predicts):
 
       for model, predicts in models_attr.items():
 
+        if model == 'brute_force':
+            continue
+
         plot_data[detector_id][model] = {}
         plot_data[detector_id][model]['x'] = []
         plot_data[detector_id][model]['y'] = []
@@ -100,8 +104,14 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     detector_id = args['representative']
     
     ax.set_title(detector_id)
+
+    # resume_comm_round = config_vars["resume_comm_round"]
     
-    
+    # if s_round and e_round:
+    #     start_plot_range = int(60/time_res*(resume_comm_round - s_round))
+    #     end_plot_range = int(60/time_res*(resume_comm_round - 1 - e_round))
+    # else:
+        
     plotting_range = int(60/time_res*plot_last_comm_rounds)
     my_xticks = deque(range((sing_x_density - 1) * input_length, plotting_range, input_length * sing_x_density))
     my_xticks.appendleft(0)
@@ -119,12 +129,17 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
     
     ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+    
+    # ax.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
 
     stand_alone_curve = mlines.Line2D([], [], color='orange', label="STAND")
     naive_fl_curve = mlines.Line2D([], [], color='lime', label="FEDAVG")
     neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+    brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
     
+    # ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
     ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
+    # ax.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
     fig.set_size_inches(8, 2)
     plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
     # plt.show()
@@ -188,17 +203,25 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
         
         subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+        
+        # subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
     
         stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
         naive_fl_curve = mlines.Line2D([], [], color='lime', label="FED")
         neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+        
+        # brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
+
+        # subplots.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve, brute_force_fl_curve], loc='best', prop={'size': 10})
 
         subplots.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
+        
+        # subplots.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
         
             
         
         
-    fig.set_size_inches(10, 4)
+    # fig.set_size_inches(10, 4)
     plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
     # plt.show()
     
@@ -210,6 +233,7 @@ def calculate_errors(plot_data):
         error_values[detector_id] = {}
         for model, predicts in prediction_method.items():
             if model != 'true':
+            # if model == 'brute_force':
                 error_values[detector_id][model] = {}
                 error_values[detector_id][model]['MAE'] = get_MAE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
                 error_values[detector_id][model]['MSE'] = get_MSE(prediction_method['true']['y'][-plotting_range:], predicts['y'][-plotting_range:])
