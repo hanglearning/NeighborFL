@@ -201,7 +201,7 @@ else:
     detector_predicts = {}
     detector_fav_neighbors = {}
     for detector_file in all_detector_files:
-        detector_id = detector_file.split('.')[0]
+        detector_id = detector_file_name.split('-')[-1].strip().split(".")[0]
         detector_predicts[detector_id] = {}
         # baseline 1 - stand_alone
         detector_predicts[detector_id]['stand_alone'] = []
