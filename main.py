@@ -88,7 +88,7 @@ parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kic
 args = parser.parse_args()
 args = args.__dict__
 
-tf.random.set_seed(args.seed)
+tf.random.set_seed(args["seed"])
 
 ''' Parse command line arguments '''
 
