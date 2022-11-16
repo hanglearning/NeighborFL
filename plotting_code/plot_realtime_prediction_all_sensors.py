@@ -5,6 +5,7 @@ from re import L
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from collections import deque
+import math
 
 import pandas as pd
 from tabulate import tabulate
@@ -46,8 +47,6 @@ with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
 input_length = config_vars["input_length"]
 plot_last_comm_rounds = args["plot_last_comm_rounds"] # to plot last plot_last_comm_rounds hours
 time_res = args["time_resolution"]
-s_round = args["starting_comm_round"]
-e_round = args["ending_comm_round"]
 sing_x_density = args["single_plot_x_axis_density"]
 mul_x_density = args["multi_plot_x_axis_density"]
 ROW = args["row"]
@@ -105,36 +104,43 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     ax.set_title(detector_id)
 
-    # resume_comm_round = config_vars["resume_comm_round"]
+    resume_comm_round = config_vars["resume_comm_round"]
+
+    if not args["starting_comm_round"]:
+        s_round = int(resume_comm_round - plot_last_comm_rounds)
+        e_round = resume_comm_round - 1
+    else:
+        s_round = args["starting_comm_round"]
+        e_round = args["ending_comm_round"]
     
-    # if s_round and e_round:
-    #     start_plot_range = int(60/time_res*(resume_comm_round - s_round))
-    #     end_plot_range = int(60/time_res*(resume_comm_round - 1 - e_round))
-    # else:
+    # no prediction in first round
+    start_plot_range = int(60/time_res* (s_round - 1))
+    end_plot_range = int(60/time_res * (e_round)) 
         
-    plotting_range = int(60/time_res*plot_last_comm_rounds)
+    plotting_range = int(60/time_res*(e_round - s_round + 1))
     my_xticks = deque(range((sing_x_density - 1) * input_length, plotting_range, input_length * sing_x_density))
-    my_xticks.appendleft(0)
+    # my_xticks.appendleft(0)
     
     ax.set_xticks(my_xticks)
-    xticklabels = list(range(config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds, config_vars["resume_comm_round"], sing_x_density))
+    # xticklabels = list(range(config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds, config_vars["resume_comm_round"], sing_x_density))
+    xticklabels = list(range(s_round, e_round + 1, sing_x_density))
     # xticklabels[0] = 1
     ax.set_xticklabels(xticklabels, Fontsize = 9, rotation = 45)
     
-    ax.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
+    ax.plot(range(plotting_range), plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range], label='True Data', color='blue')
     true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
 
-    ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
+    ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range], label='naive_fl', color='lime')
 
-    ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
+    ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range], label='stand_alone', color='orange')
     
-    ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+    ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range], label='fav_neighbors_fl', color='red')
     
     # ax.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
 
-    stand_alone_curve = mlines.Line2D([], [], color='orange', label="STAND")
-    naive_fl_curve = mlines.Line2D([], [], color='lime', label="FEDAVG")
-    neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+    stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
+    naive_fl_curve = mlines.Line2D([], [], color='lime', label="BFRT")
+    neighbor_fl_curve = mlines.Line2D([], [], color='red', label="KFRT")
     brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
     
     # ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
@@ -166,7 +172,8 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     
     my_xticks = [0, plotting_range//2, plotting_range-2]
-    my_xticklabels = [config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds + 1, config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds//2 + 1, config_vars["resume_comm_round"] - 1]
+    # my_xticklabels = [config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds + 1, config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds//2 + 1, config_vars["resume_comm_round"] - 1]
+    my_xticklabels = [s_round, math.ceil((s_round + e_round)/2), e_round]
     
     
     detector_lists.remove(args['representative'])
@@ -190,25 +197,25 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         # subplots.set_xlabel('Comm Round')
         subplots.set_title(detector_id)
         
-        plotting_range = int(60/time_res*plot_last_comm_rounds)
+        # plotting_range = int(60/time_res*plot_last_comm_rounds)
         
         subplots.set_xticks(my_xticks)
         subplots.set_xticklabels(my_xticklabels)
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['true']['y'][-plotting_range:], label='True Data', color='blue')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range], label='True Data', color='blue')
         true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][-plotting_range:], label='naive_fl', color='lime')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range], label='naive_fl', color='lime')
 
-        subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][-plotting_range:], label='stand_alone', color='orange')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range], label='stand_alone', color='orange')
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][-plotting_range:], label='fav_neighbors_fl', color='red')
+        subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range], label='fav_neighbors_fl', color='red')
         
-        # subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
+        # subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][start_plot_range:end_plot_range], label='brute_force', color='violet')
     
         stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
-        naive_fl_curve = mlines.Line2D([], [], color='lime', label="FED")
-        neighbor_fl_curve = mlines.Line2D([], [], color='red', label="NEIBOR")
+        naive_fl_curve = mlines.Line2D([], [], color='lime', label="BFRT")
+        neighbor_fl_curve = mlines.Line2D([], [], color='red', label="KFRT")
         
         # brute_force_fl_curve = mlines.Line2D([], [], color='violet', label="brute_force")
 
@@ -221,7 +228,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
             
         
         
-    # fig.set_size_inches(10, 4)
+    fig.set_size_inches(10, 6)
     plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
     # plt.show()
     

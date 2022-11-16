@@ -67,7 +67,7 @@ class Detector:
         for detector_id, detector in list_of_detectors.items():
             if detector == self:
                 continue
-            distance = haversine(self.loc, detector.loc)
+            distance = haversine(self.loc, detector.loc, unit='mi')
             if not self.radius:
                 # treat all participants as neighbors
                 self.neighbors.append((detector, distance))
@@ -85,6 +85,7 @@ class Detector:
         elif self.add_heuristic == 2:
             # add neighbors randomly
             self.neighbors = random.shuffle(self.neighbors)
+        print(f"Detector {self.id} has detected {len(self.neighbors)} potential neighbors within radius {self.radius} miles.")
             
     def set_brute_force_neighbor_combinations(self, list_of_detectors):
         detector_ids = [d for d in list(list_of_detectors.keys()) if d != self.id]
