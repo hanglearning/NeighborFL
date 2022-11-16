@@ -1,3 +1,12 @@
+# check two things from presentation
+
+# 1. if detector skipped in the first place rather than kicked, still give retry interval
+# 2. adding neighbor should be before a round's global model update, to include this neighbor
+# 3. do not wait until fav_neighbor_list is full to kick
+
+# TODO
+# 1. Maybe consider more than one round to test for error to add neighbor to the list
+# 2. Maybe consider accumulated error when kicking, rather than continuous rounds.
 
 from Detector import Detector
 
@@ -27,6 +36,7 @@ from error_calc import get_RMSE
 from error_calc import get_MAPE
 
 import random
+import tensorflow as tf
 
 # remove some warnings
 import logging
@@ -37,9 +47,10 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
 
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/traffic_data/', help='dataset path')
+parser.add_argument('-dp', '--dataset_path', type=str, default='./data', help='dataset path')
 parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/KFRT_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
+parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 
 # arguments for resume training
 parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
@@ -63,7 +74,7 @@ parser.add_argument('-ms', '--max_data_size', type=int, default=24, help='maximu
 # arguments for fav_neighbor fl
 parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
 parser.add_argument('-k', '--k', type=float, default=None, help='maximum number of fav_neighbors. radius and k can be used together, but radius has the priority')
-parser.add_argument('-et', '--error_type', type=str, default="MAE", help='the error type to evaluate potential neighbors')
+parser.add_argument('-et', '--error_type', type=str, default="MAPE", help='the error type to evaluate potential neighbors')
 parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to try in each comm_round')
 parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heuristic to add fav neighbors: 1 - add by distance from close to far, 2 - add randomly')
 # arguments for fav_neighbor kicking
@@ -76,6 +87,9 @@ parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kic
 
 args = parser.parse_args()
 args = args.__dict__
+
+tf.random.set_seed(args.seed)
+
 ''' Parse command line arguments '''
 
 stand_alone_model_path = 'stand_alone'
@@ -143,7 +157,7 @@ else:
     list_of_detectors = {}
     for detector_file_iter in range(len(all_detector_files)):
         detector_file_name = all_detector_files[detector_file_iter]
-        detector_id = detector_file_name.split('.')[0]
+        detector_id = detector_file_name.split('-')[-1]
         # data file path
         file_path = os.path.join(config_vars['dataset_path'], detector_file_name)
         
