@@ -47,7 +47,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
 
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/KFRT_data/', help='dataset path')
+parser.add_argument('-dp', '--dataset_path', type=str, default='./data', help='dataset path')
 parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/KFRT_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
