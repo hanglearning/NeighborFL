@@ -11,7 +11,7 @@ Processing the data
 """
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-attr = 'volume'
+attr = 'Volume'
 
 def get_scaler(df_whole):
     scaler = MinMaxScaler(feature_range=(0, 1)).fit(df_whole[attr].values.reshape(-1, 1))
