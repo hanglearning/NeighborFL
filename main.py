@@ -157,7 +157,7 @@ else:
     list_of_detectors = {}
     for detector_file_iter in range(len(all_detector_files)):
         detector_file_name = all_detector_files[detector_file_iter]
-        detector_id = detector_file_name.split('-')[-1]
+        detector_id = detector_file_name.split('-')[-1].strip()
         # data file path
         file_path = os.path.join(config_vars['dataset_path'], detector_file_name)
         
@@ -170,7 +170,7 @@ else:
         print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
         whole_data_record[detector_id] = whole_data
         # create a detector object
-        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lat']), longitude=float(detector_locations[detector_locations.device_id==int(detector_id.split('_')[0])]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
+        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==detector_id]['lat']), longitude=float(detector_locations[detector_locations.device_id==detector_id]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
         list_of_detectors[detector_id] = detector
     config_vars["individual_min_data_sample"] = individual_min_data_sample
     
