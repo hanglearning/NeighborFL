@@ -93,6 +93,9 @@ parser.add_argument('--brute_force_fl', type=int, default=1, help='run brute_for
 
 args = parser.parse_args()
 args = args.__dict__
+
+tf.random.set_seed(args.seed)
+
 ''' Parse command line arguments '''
 
 stand_alone_model_path = 'stand_alone'
