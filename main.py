@@ -356,10 +356,6 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
         stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector_predicts[detector_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
-        # debug
-        if comm_round == 1:
-            with open(f'{logs_dirpath}/2nd_round_errors_debug.txt', "a") as file:
-                file.write(f"{detector_id} - stand: {stand_alone_predictions} \n\n")
 
         detecotr_iter += 1
         
@@ -407,10 +403,6 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
-        # debug
-        if comm_round == 1:
-            with open(f'{logs_dirpath}/2nd_round_errors_debug.txt', "a") as file:
-                file.write(f"{detector_id} - fav: {fav_neighbors_fl_agg_model_predictions} \n\n")
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
         ''' if len(fav_neighbors) < k, try new neighbors! '''
