@@ -27,8 +27,6 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table')
-parser.add_argument('-et', '--error_type', type=str, default="MAE", help='the error type to plot and calculate')
-parser.add_argument('-yt', '--y_top', type=int, default=150, help='the max error value on y-axis')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-er', '--end_round', type=int, default=None, help='provide the ending communication round, by default the last round of the simulation')
@@ -187,9 +185,17 @@ def compare_l1_smallest_equal_percent(l1, l2, l3):
     percent_string = f"{percentage:.2%}"
     return percentage, percent_string
 
-def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, error_to_plot, ylim, COL):
+def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, error_to_plot, COL):
+
     sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
-    # sensor_lists = ['19940_03-10-2017_to_05-10-2017']
+    
+    # determine y_top (ylim)
+    ylim = 0
+    for realtime_errors in realtime_error_table.values():
+        for model_errors in realtime_errors.values():
+            max_err = max(model_errors[error_to_plot])
+            ylim = max_err if max_err > ylim else ylim
+
     # if ROW == 1:
     #   COL = len(sensor_lists)
     if ROW == 1 and COL is None:
@@ -198,13 +204,14 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
     plt.setp(axs, ylim=(0, ylim))
     if ROW == 1 and COL == 1:
         axs.set_xlabel('Round Range', size=13)
-        axs.set_ylabel(f'{error_to_plot} Error', size=13)
+        axs.set_ylabel(f'{error_to_plot} Value', size=13)
     elif ROW == 1 and COL > 1:
         axs[COL//2].set_xlabel('Round Range', size=13)
-        axs[0].set_ylabel(f'{error_to_plot} Error', size=13)
+        axs[0].set_ylabel(f'{error_to_plot} Value', size=13)
     elif ROW > 1 and COL > 1:
         axs[ROW-1][COL//2].set_xlabel('Round Range', size=13)
-        axs[ROW//2][0].set_ylabel(f'{error_to_plot} Error', size=13)
+        axs[ROW//2][0].set_ylabel(f'{error_to_plot} Value', size=13)
+    
       
     # axs[0].set_ylabel(f'{error_to_plot} Error', size=13)
     # fig.text(0.5, 0.04, 'Comm Round Index', ha='center', size=13)
@@ -232,7 +239,7 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         
         
         subplots.set_xticks([0, num_of_plot_points // 2, num_of_plot_points - 1])
-        subplots.set_xticklabels([f'  1-\n{e_interval}', f'{(num_of_plot_points // 2 - 1) * e_interval}-\n{num_of_plot_points // 2 * e_interval}', f'{(num_of_plot_points - 1) * e_interval}-\n{end_round}'], fontsize=8)
+        subplots.set_xticklabels([f'  2-\n{(num_of_plot_points // 2 - 1) * e_interval}', f'{(num_of_plot_points // 2 - 1) * e_interval + 1}-\n{(num_of_plot_points - 1) * e_interval}', f'{(num_of_plot_points - 1) * e_interval + 1}-\n{end_round}'], fontsize=8)
         
         
         # all real
@@ -242,14 +249,24 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
 
         
         # compare naive_fl vs. fav_neighbors_fl and show smaller-error-value percentage, normalized
-        fav_better_percent_val, fav_better_percent_string = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
+        fav_better_percent_val_fav_vs_naive, fav_better_percent_string_fav_vs_naive = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
+        # same for standalone vs. fav_neighbors_fl
+        fav_better_percent_val_fav_vs_standalone, fav_better_percent_string_fav_vs_standalone = compare_l1_smaller_equal_percent(model_error_normalized['stand_alone'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
 
-        if fav_better_percent_val >= 0.5:
-          annotation_color = 'red'
+        if fav_better_percent_val_fav_vs_naive >= 0.5:
+          annotation_color_fav_vs_naive = 'red'
         else:
-          annotation_color = 'black'
+          annotation_color_fav_vs_naive = 'black'
 
-        subplots.annotate(fav_better_percent_string, xy=(num_of_plot_points - 5, model_error_normalized['stand_alone'][error_to_plot][-5] + 15), size=8, color=annotation_color)
+        if fav_better_percent_val_fav_vs_standalone >= 0.5:
+          annotation_color_fav_vs_standalone = 'red'
+        else:
+          annotation_color_fav_vs_standalone = 'black'
+
+        # annotate fav_vs_naive
+        subplots.annotate(f"N:{fav_better_percent_string_fav_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.65), size=8, color=annotation_color_fav_vs_naive)
+        # annotate fav_vs_standalone
+        subplots.annotate(f"S:{fav_better_percent_string_fav_vs_standalone}", xy=(num_of_plot_points * 0.6, ylim * 0.6), size=8, color=annotation_color_fav_vs_standalone)
 
 
         '''
@@ -278,23 +295,37 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
     # baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
     # global_curve = mlines.Line2D([], [], color='#5a773a', label="FED")    
     # fig.legend(handles=[baseline_curve, global_curve], loc='upper center')
-    fig.set_size_inches(10, 1.8)
+    fig.set_size_inches(2 * len(sensor_lists), 3.8)
     plt.savefig(f'{plot_dir_path}/real_time_errors_all_sensors_{error_to_plot}.png', bbox_inches='tight', dpi=300)
     # plt.show()
     
 realtime_error_table = construct_realtime_error_table(detector_predicts)
 
 # show table
-with open(f'{plot_dir_path}/errors.txt', "w") as file:
-  for sensor_id, model in realtime_error_table.items():  
-      file.write(f'\nfor {sensor_id}')
-      error_values_df = pd.DataFrame.from_dict(model)
-      file.write(tabulate(error_values_df.round(2), headers='keys', tablefmt='psql'))
-      file.write('\n')
+if False:
+    with open(f'{plot_dir_path}/errors.txt', "w") as file:
+        for sensor_id, model in realtime_error_table.items():  
+            file.write(f'\nfor {sensor_id}')
+            error_values_df = pd.DataFrame.from_dict(model)
+            file.write(tabulate(error_values_df.round(2), headers='keys', tablefmt='psql'))
+            file.write('\n')
+
+# debug - The designated training error of fav should always be equal to standalone in the 2nd round
+if True:
+    with open(f'{plot_dir_path}/errors_debug.txt', "w") as file:
+        for sensor_id, model in realtime_error_table.items():  
+            file.write(f'\nfor {sensor_id}')
+            error_values_df = pd.DataFrame.from_dict(model)
+            file.write(f"stand_alone MAPE - {error_values_df['stand_alone']['MAPE'][0]}, fav MAPE - {error_values_df['fav_neighbors_fl']['MAPE'][0]}, {error_values_df['fav_neighbors_fl']['MAPE'][0] == error_values_df['stand_alone']['MAPE'][0]}")
+            file.write('\n')
     
 # show plots
 all_prediction_errors = calculate_errors(detector_predicts) # calculate global model outperform percentage
-plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, args['error_type'], args['y_top'], COL)
+
+# err_type_to_y_top = {"MAE": }
+for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
+    print(f"Plotting {err_type}...")
+    plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, err_type, COL)
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
 # for error_type in error_ylim.keys():
 #   plot_realtime_errors_all_sensors(realtime_error_table, error_type, error_ylim[error_type])

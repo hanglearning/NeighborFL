@@ -88,7 +88,14 @@ parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kic
 args = parser.parse_args()
 args = args.__dict__
 
-tf.random.set_seed(args["seed"])
+# https://stackoverflow.com/questions/60058588/tesnorflow-2-0-tf-random-set-seed-not-working-since-i-am-getting-different-resul
+def reset_random_seeds():
+   os.environ['PYTHONHASHSEED']=str(args["seed"])
+   tf.random.set_seed(args["seed"])
+   np.random.seed(args["seed"])
+   random.seed(args["seed"])
+
+reset_random_seeds()
 
 ''' Parse command line arguments '''
 
@@ -296,7 +303,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # record data
         detector.set_X_test(X_test)
         detector.set_y_true(y_true)
-        detector_predicts[detector_id]['true'].append((comm_round,y_true))
+        detector_predicts[detector_id]['true'].append((comm_round + 1,y_true))
         
         ''' Training '''
         ''' Baselines'''
@@ -348,7 +355,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"{detector_id} is now predicting by its stand_alone model...")
         stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
         stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['stand_alone'].append((comm_round,stand_alone_predictions))
+        detector_predicts[detector_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
+        # debug
+        if comm_round == 1:
+            with open(f'{logs_dirpath}/2nd_round_errors_debug.txt', "a") as file:
+                file.write(f"{detector_id} - stand: {stand_alone_predictions} \n\n")
 
         detecotr_iter += 1
         
@@ -372,7 +383,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
         new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
-        detector_predicts[detector_id]['naive_fl'].append((comm_round,new_naive_fl_global_model_predictions))
+        detector_predicts[detector_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
         detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
@@ -395,7 +406,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"{detector_id} now predicting by its fav_neighbors_fl_agg_model.")
         fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round,fav_neighbors_fl_agg_model_predictions))
+        detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
+        # debug
+        if comm_round == 1:
+            with open(f'{logs_dirpath}/2nd_round_errors_debug.txt', "a") as file:
+                file.write(f"{detector_id} - fav: {fav_neighbors_fl_agg_model_predictions} \n\n")
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
         ''' if len(fav_neighbors) < k, try new neighbors! '''
