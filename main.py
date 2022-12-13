@@ -50,6 +50,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/KFRT_data', help='dataset path')
 parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/KFRT_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
+parser.add_argument('-dir', '--direction', type=int, default=1, help='also do fedavg within only N or S')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 
 # arguments for resume training
@@ -102,6 +103,9 @@ reset_random_seeds()
 stand_alone_model_path = 'stand_alone'
 naive_fl_local_model_path = 'naive_fl_local'
 naive_fl_global_model_path = 'naive_fl_global'
+same_dir_fl_local_model_path = 'same_dir_fl_local'
+N_dir_fedavg_fl_global_model_path = 'N_dir_fedavg_global'
+S_dir_fedavg_fl_global_model_path = 'S_dir_fedavg_global'
 fav_neighbors_fl_local_model_path = 'fav_neighbors_fl_local'
 fav_neighbors_fl_agg_model_path = 'fav_neighbors_fl_agg'
 tried_fav_neighbors_fl_agg_model_path = 'tried_fav_neighbors_fl_agg'
@@ -216,6 +220,8 @@ else:
         detector_predicts[detector_id]['naive_fl'] = []
         # fav_neighbors_fl model
         detector_predicts[detector_id]['fav_neighbors_fl'] = []
+        # same_dir_fl model
+        detector_predicts[detector_id]['same_dir_fl'] = []
         # true
         detector_predicts[detector_id]['true'] = []
         # fav_neighbor records
@@ -309,16 +315,20 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         ''' Baselines'''
         print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
-        print(f"{detector_id} training stand_alone model.. (1/3)")
+        print(f"{detector_id} training stand_alone model.. (1/4)")
         new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, stand_alone_model_path)
         # naive_fl local model
-        print(f"{detector_id} training naive_fl local model.. (2/3)")
+        print(f"{detector_id} training naive_fl local model.. (2/4)")
         new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
+        # same dir fedavg local model
+        print(f"{detector_id} training same_dir_fl local model.. (3/4)")
+        new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
+        detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
         ''' fav_neighbors_fl (core algorithm)'''
         # fav_neighbors_fl local model
-        print(f"{detector_id} training fav_neighbors_fl local model.. (3/3)")
+        print(f"{detector_id} training fav_neighbors_fl local model.. (4/4)")
         chosen_model = detector.get_last_fav_neighbors_fl_agg_model() # by default
         if comm_round > 1:
             error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
@@ -380,6 +390,43 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
         detector_predicts[detector_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
+        detecotr_iter += 1
+
+    ''' Simulate Same Dir FedAvg '''
+    # create naive_fl model from all naive_fl_local models
+    print("Predicting on Same Dir FedAvg model")
+    N_dir_fedavg_global_model = create_model(model_units, model_configs)
+    S_dir_fedavg_global_model = create_model(model_units, model_configs)
+    N_dir_fedavg_local_models_weights = []
+    S_dir_fedavg_local_models_weights = []
+    
+    for detector_id, detector in list_of_detectors.items():
+        if detector_id.split('_')[1] == 'N':
+            N_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
+        else:
+            S_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
+    N_dir_fedavg_global_model.set_weights(np.mean(N_dir_fedavg_local_models_weights, axis=0))
+    S_dir_fedavg_global_model.set_weights(np.mean(S_dir_fedavg_local_models_weights, axis=0))
+    # save new_naive_fl_global_model
+    Detector.save_N_global_model(N_dir_fedavg_global_model, comm_round, N_dir_fedavg_fl_global_model_path)
+    Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fedavg_fl_global_model_path)
+    
+    detecotr_iter = 1
+    for detector_id, detector in list_of_detectors.items():
+        if detector_id.split('_')[1] == 'N':
+            same_dir_fl_global_model_path = N_dir_fedavg_fl_global_model_path
+            new_same_dir_fl_global_model = N_dir_fedavg_global_model
+        else:
+            same_dir_fl_global_model_path = S_dir_fedavg_fl_global_model_path
+            new_same_dir_fl_global_model = S_dir_fedavg_global_model
+        # update new_same_dir_fl_global_model
+        detector.update_fl_global_model(comm_round, same_dir_fl_global_model_path)
+        # do prediction
+        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
+        new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
+        new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+        detector
+        detector_predicts[detector_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
         detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    

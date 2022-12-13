@@ -23,8 +23,12 @@ class Detector:
         self.naive_fl_global_model_path = None # CCGrid
         self.fav_neighbors_fl_local_model_path = None
         self.fav_neighbors_fl_agg_model_path = None # aggregated
+        self.same_dir_fl_local_model_path = None
+        self.same_dir_fl_global_model_path = None
+
         self.fav_neighbors_fl_predictions = None
         self.tried_fav_neighbors_fl_agg_model_path = None # aggregated
+
         self.tried_fav_neighbors_fl_predictions = None
         self.neighbors = [] # candidate neighbors
         self.fav_neighbors = []
@@ -35,7 +39,7 @@ class Detector:
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
         self.neighbor_fl_error_records = []
-            
+
     def assign_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():
             if detector == self:
@@ -59,7 +63,8 @@ class Detector:
         self.stand_alone_model_path = global_model_0_path
         self.naive_fl_global_model_path = global_model_0_path
         self.fav_neighbors_fl_agg_model_path = global_model_0_path
-    
+        self.same_dir_fl_global_model_path = global_model_0_path
+
     def get_stand_alone_model(self):
         return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)
     
@@ -68,6 +73,12 @@ class Detector:
     
     def get_last_naive_fl_global_model(self):
         return load_model(f'{self.logs_dirpath}/{self.naive_fl_global_model_path}', compile = False)
+
+    def get_same_dir_fl_local_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.same_dir_fl_local_model_path}', compile = False)
+    
+    def get_last_same_dir_fl_global_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.same_dir_fl_global_model_path}', compile = False)
     
     def get_fav_neighbors_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}', compile = False)
@@ -85,9 +96,20 @@ class Detector:
     def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
         new_model.save(f'{cls.logs_dirpath}/{naive_fl_global_model_path}/comm_{comm_round}.h5')
         cls.delete_historical_models(f'{cls.logs_dirpath}/{naive_fl_global_model_path}', comm_round)
+
+    def save_N_global_model(cls, new_model, comm_round, N_dir_fedavg_fl_global_model_path):
+        new_model.save(f'{cls.logs_dirpath}/{N_dir_fedavg_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{cls.logs_dirpath}/{N_dir_fedavg_fl_global_model_path}', comm_round)
+
+    def save_S_global_model(cls, new_model, comm_round, S_dir_fedavg_fl_global_model_path):
+        new_model.save(f'{cls.logs_dirpath}/{S_dir_fedavg_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{cls.logs_dirpath}/{S_dir_fedavg_fl_global_model_path}', comm_round)
     
     def update_fl_global_model(self, comm_round, naive_fl_global_model_path):
         self.naive_fl_global_model_path = f'{naive_fl_global_model_path}/comm_{comm_round}.h5'
+
+    def update_same_dir_fl_global_model(self, comm_round, same_dir_fl_global_model_path):
+        self.naive_fl_global_model_path = f'{same_dir_fl_global_model_path}/comm_{comm_round}.h5'
         
     def update_and_save_model(self, new_model, comm_round, model_folder_name):
         os.makedirs(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', exist_ok=True)
@@ -97,6 +119,8 @@ class Detector:
             self.stand_alone_model_path = new_model_path
         elif model_folder_name == 'naive_fl_local': 
             self.naive_fl_local_model_path = new_model_path
+        elif model_folder_name == 'same_dir_fl_local': 
+            self.same_dir_fl_local_model_path = new_model_path
         elif model_folder_name == 'fav_neighbors_fl_local': 
             self.fav_neighbors_fl_local_model_path = new_model_path
         elif model_folder_name == 'fav_neighbors_fl_agg': 

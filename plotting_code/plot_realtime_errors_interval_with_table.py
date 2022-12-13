@@ -309,14 +309,12 @@ if False:
             error_values_df = pd.DataFrame.from_dict(model)
             file.write(tabulate(error_values_df.round(2), headers='keys', tablefmt='psql'))
             file.write('\n')
-
-# debug - The designated training error of fav should always be equal to standalone in the 2nd round
-if True:
-    with open(f'{plot_dir_path}/errors_debug.txt', "w") as file:
+if False:
+    with open(f'{plot_dir_path}/errors_2nd.txt', "w") as file:
         for sensor_id, model in realtime_error_table.items():  
             file.write(f'\nfor {sensor_id}')
             error_values_df = pd.DataFrame.from_dict(model)
-            file.write(f"stand_alone MAPE - {error_values_df['stand_alone']['MAPE'][0]}, fav MAPE - {error_values_df['fav_neighbors_fl']['MAPE'][0]}, {error_values_df['fav_neighbors_fl']['MAPE'][0] == error_values_df['stand_alone']['MAPE'][0]}")
+            file.write(f"{sensor_id} stand_alone: {error_values_df['stand_alone']['MAE'][0]}, fav: {error_values_df['fav_neighbors_fl']['MAE'][0]}, {error_values_df['stand_alone']['MAE'][0] == error_values_df['fav_neighbors_fl']['MAE'][0]}")
             file.write('\n')
     
 # show plots
