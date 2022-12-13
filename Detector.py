@@ -97,19 +97,21 @@ class Detector:
         new_model.save(f'{cls.logs_dirpath}/{naive_fl_global_model_path}/comm_{comm_round}.h5')
         cls.delete_historical_models(f'{cls.logs_dirpath}/{naive_fl_global_model_path}', comm_round)
 
-    def save_N_global_model(cls, new_model, comm_round, N_dir_fedavg_fl_global_model_path):
-        new_model.save(f'{cls.logs_dirpath}/{N_dir_fedavg_fl_global_model_path}/comm_{comm_round}.h5')
-        cls.delete_historical_models(f'{cls.logs_dirpath}/{N_dir_fedavg_fl_global_model_path}', comm_round)
+    @classmethod
+    def save_N_global_model(cls, new_model, comm_round, N_dir_fl_global_model_path):
+        new_model.save(f'{cls.logs_dirpath}/{N_dir_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{cls.logs_dirpath}/{N_dir_fl_global_model_path}', comm_round)
 
-    def save_S_global_model(cls, new_model, comm_round, S_dir_fedavg_fl_global_model_path):
-        new_model.save(f'{cls.logs_dirpath}/{S_dir_fedavg_fl_global_model_path}/comm_{comm_round}.h5')
-        cls.delete_historical_models(f'{cls.logs_dirpath}/{S_dir_fedavg_fl_global_model_path}', comm_round)
+    @classmethod
+    def save_S_global_model(cls, new_model, comm_round, S_dir_fl_global_model_path):
+        new_model.save(f'{cls.logs_dirpath}/{S_dir_fl_global_model_path}/comm_{comm_round}.h5')
+        cls.delete_historical_models(f'{cls.logs_dirpath}/{S_dir_fl_global_model_path}', comm_round)
     
     def update_fl_global_model(self, comm_round, naive_fl_global_model_path):
         self.naive_fl_global_model_path = f'{naive_fl_global_model_path}/comm_{comm_round}.h5'
 
     def update_same_dir_fl_global_model(self, comm_round, same_dir_fl_global_model_path):
-        self.naive_fl_global_model_path = f'{same_dir_fl_global_model_path}/comm_{comm_round}.h5'
+        self.same_dir_fl_global_model_path = f'{same_dir_fl_global_model_path}/comm_{comm_round}.h5'
         
     def update_and_save_model(self, new_model, comm_round, model_folder_name):
         os.makedirs(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', exist_ok=True)

@@ -104,8 +104,8 @@ stand_alone_model_path = 'stand_alone'
 naive_fl_local_model_path = 'naive_fl_local'
 naive_fl_global_model_path = 'naive_fl_global'
 same_dir_fl_local_model_path = 'same_dir_fl_local'
-N_dir_fedavg_fl_global_model_path = 'N_dir_fedavg_global'
-S_dir_fedavg_fl_global_model_path = 'S_dir_fedavg_global'
+N_dir_fl_global_model_path = 'N_dir_fedavg_global'
+S_dir_fl_global_model_path = 'S_dir_fedavg_global'
 fav_neighbors_fl_local_model_path = 'fav_neighbors_fl_local'
 fav_neighbors_fl_agg_model_path = 'fav_neighbors_fl_agg'
 tried_fav_neighbors_fl_agg_model_path = 'tried_fav_neighbors_fl_agg'
@@ -408,19 +408,19 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     N_dir_fedavg_global_model.set_weights(np.mean(N_dir_fedavg_local_models_weights, axis=0))
     S_dir_fedavg_global_model.set_weights(np.mean(S_dir_fedavg_local_models_weights, axis=0))
     # save new_naive_fl_global_model
-    Detector.save_N_global_model(N_dir_fedavg_global_model, comm_round, N_dir_fedavg_fl_global_model_path)
-    Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fedavg_fl_global_model_path)
+    Detector.save_N_global_model(N_dir_fedavg_global_model, comm_round, N_dir_fl_global_model_path)
+    Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fl_global_model_path)
     
     detecotr_iter = 1
     for detector_id, detector in list_of_detectors.items():
         if detector_id.split('_')[1] == 'N':
-            same_dir_fl_global_model_path = N_dir_fedavg_fl_global_model_path
+            same_dir_fl_global_model_path = N_dir_fl_global_model_path
             new_same_dir_fl_global_model = N_dir_fedavg_global_model
         else:
-            same_dir_fl_global_model_path = S_dir_fedavg_fl_global_model_path
+            same_dir_fl_global_model_path = S_dir_fl_global_model_path
             new_same_dir_fl_global_model = S_dir_fedavg_global_model
         # update new_same_dir_fl_global_model
-        detector.update_fl_global_model(comm_round, same_dir_fl_global_model_path)
+        detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
         # do prediction
         print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
         new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
