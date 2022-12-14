@@ -8,6 +8,9 @@ from tensorflow.keras.models import load_model
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
+    # if it's 1st comm round or whenever starting a new Monday, need to flush memory and start with 24 training samples
+    reset_mem = True
+    training_data_starting_index = 0
     def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
         self.id = id
         self.loc = (latitude, longitude)

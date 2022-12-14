@@ -27,8 +27,8 @@ from model_training import train_model
 
 from process_data import get_scaler
 from process_data import process_train_data
-from process_data import process_test_one_step
-from process_data import process_test_multi_and_get_y_true
+from process_data import process_test
+from process_data import process_test_get_y_true
 
 from error_calc import get_MAE
 from error_calc import get_MSE
@@ -272,36 +272,40 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
-    if comm_round == 1:
-        training_data_starting_index = 0
-        training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
+    if Detector.reset_mem:
+        training_data_ending_index = Detector.training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
+        Detector.reset_mem = False
         # if it's comm_round 1 and input_shape 12, need at least 24 training data points because the model at least needs 13 points to train.
         # Therefore,
         # comm_round 1 -> 1~24 training points, predict with test 13~35 test points, 
         # 1- 24， 2 - 36， 3 - 48， 4 - 60
     else:
         training_data_ending_index = (comm_round + 1) * new_sample_size_per_comm_round - 1
-        training_data_starting_index = training_data_ending_index - config_vars['max_data_size']
-        if training_data_starting_index < 1:
-            training_data_starting_index = 0
+        Detector.training_data_starting_index = max(training_data_ending_index - config_vars['max_data_size'] + 1, 0)
+
     # test data
     test_data_starting_index = training_data_ending_index - new_sample_size_per_comm_round + 1
-    test_data_ending_index_one_step = test_data_starting_index + new_sample_size_per_comm_round * 2 - 1
-    test_data_ending_index_chained_multi = test_data_starting_index + new_sample_size_per_comm_round - 1
+    test_data_ending_index = test_data_starting_index + new_sample_size_per_comm_round * 2 - 1
     
     detecotr_iter = 1
     for detector_id, detector in list_of_detectors.items():
-        ''' Process traning data '''
+        ''' Slice data '''
         # slice training data
-        train_data = whole_data_record[detector_id][training_data_starting_index: training_data_ending_index + 1]
+        train_data = whole_data_record[detector_id][Detector.training_data_starting_index: training_data_ending_index + 1]
+        # slice test data
+        test_data = whole_data_record[detector_id][test_data_starting_index: test_data_ending_index + 1]
+        # determine if flush mem
+        last_training_point_day = pd.Timestamp(train_data['Date'].iloc[-1]).isoweekday()
+        first_test_point_day = pd.Timestamp(test_data['Date'].iloc[0]).isoweekday()
+        if last_training_point_day == 5 and '23:55:00' in train_data['Date'].iloc[-1]:
+            Detector.reset_mem = True
+
+        ''' Process test data '''
         # process training data
         X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH)
-        ''' Process test data '''
-        # slice test data
-        test_data = whole_data_record[detector_id][test_data_starting_index: test_data_ending_index_one_step + 1]
         # process test data
-        X_test, _ = process_test_one_step(test_data, scaler, INPUT_LENGTH)
-        _, y_true = process_test_multi_and_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'])
+        X_test, _ = process_test(test_data, scaler, INPUT_LENGTH)
+        _, y_true = process_test_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'])
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))
@@ -309,11 +313,16 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # record data
         detector.set_X_test(X_test)
         detector.set_y_true(y_true)
-        detector_predicts[detector_id]['true'].append((comm_round + 1,y_true))
+        if Detector.reset_mem:
+            # no prediction this round
+            detector_predicts[detector_id]['true'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+        else:
+            # do prediction
+            detector_predicts[detector_id]['true'].append((comm_round + 1,y_true))
         
         ''' Training '''
         ''' Baselines'''
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
+        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {Detector.training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
         print(f"{detector_id} training stand_alone model.. (1/4)")
         new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
@@ -330,10 +339,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # fav_neighbors_fl local model
         print(f"{detector_id} training fav_neighbors_fl local model.. (4/4)")
         chosen_model = detector.get_last_fav_neighbors_fl_agg_model() # by default
-        if comm_round > 1:
+        if comm_round > 1 and not Detector.reset_mem:
             error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
             detector.neighbor_fl_error_records.append(error_without_new_neighbors)
-        if detector.tried_neighbors:
+        if detector.tried_neighbors and not Detector.reset_mem:
             print(f"{detector_id} comparing models with and without tried neighbor(s) to determine which model to train...")
             error_with_new_neighbors = get_error(y_true, detector.tried_fav_neighbors_fl_predictions)
             error_diff = error_without_new_neighbors - error_with_new_neighbors
@@ -362,10 +371,15 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         print(f"{detector_id}'s current fav neighbors are {current_fav_neighbors}.")
         
         ''' stand_alone model predictions '''
-        print(f"{detector_id} is now predicting by its stand_alone model...")
-        stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
-        stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
+        if Detector.reset_mem:
+            # no prediction this round
+            print(f"{detector_id} mem reset. No stand_alone prediction this round.")
+            detector_predicts[detector_id]['stand_alone'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+        else:
+            print(f"{detector_id} is now predicting by its stand_alone model...")
+            stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
+            stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            detector_predicts[detector_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
 
         detecotr_iter += 1
         
@@ -384,13 +398,18 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     for detector_id, detector in list_of_detectors.items():
         # update new_naive_fl_global_model
         detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
-        # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
-        new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
-        new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector
-        detector_predicts[detector_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
-        detecotr_iter += 1
+        if Detector.reset_mem:
+            # no prediction this round
+            print(f"{detector_id} mem reset. No naive_fl prediction this round.")
+            detector_predicts[detector_id]['stand_alone'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+        else: # TODO
+            # do prediction
+            print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
+            new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
+            new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            detector
+            detector_predicts[detector_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
+            detecotr_iter += 1
 
     ''' Simulate Same Dir FedAvg '''
     # create naive_fl model from all naive_fl_local models
@@ -422,12 +441,17 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # update new_same_dir_fl_global_model
         detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
         # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
-        new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
-        new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector
-        detector_predicts[detector_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
-        detecotr_iter += 1
+        if Detector.reset_mem:
+            # no prediction this round
+            print(f"{detector_id} mem reset. No same_dir_fl prediction this round.")
+            detector_predicts[detector_id]['same_dir_fl'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+        else:
+            print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
+            new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
+            new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            detector
+            detector_predicts[detector_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
+            detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
     # determine if add new neighbor or not (core algorithm)
@@ -446,11 +470,16 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # save model
         detector.update_and_save_model(fav_neighbors_fl_agg_model, comm_round, fav_neighbors_fl_agg_model_path)
         # do prediction
-        print(f"{detector_id} now predicting by its fav_neighbors_fl_agg_model.")
-        fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
-        fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
-        detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
+        if Detector.reset_mem:
+            # no prediction this round
+            print(f"{detector_id} mem reset. No fav_neighbors_fl prediction this round.")
+            detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+        else:
+            print(f"{detector_id} now predicting by its fav_neighbors_fl_agg_model.")
+            fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
+            fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
+            detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
         ''' if len(fav_neighbors) < k, try new neighbors! '''
         try_new_neighbors = False
@@ -459,6 +488,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 try_new_neighbors = True
         else:
             try_new_neighbors = True
+
+        if Detector.reset_mem:
+            try_new_neighbors = False
         
         tried_fav_neighbors_fl_agg_model = create_model(model_units, model_configs)
         detector.tried_neighbors = []
@@ -480,12 +512,14 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             candidate_iter += 1
                     
         tried_fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
+        
         # do prediction
         print(f"{detector_id} now predicting by the tried_fav_neighbors_fl_agg_model (has the model from the newly tried neighbor(s)).")
         tried_fav_neighbors_fl_agg_model_predictions = tried_fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         tried_fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(tried_fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+        # When mem_reset==True, tried_neighbor is empty, then tried_fav_neighbors_fl_agg_model_predictions won't be used next round
         detector.tried_fav_neighbors_fl_predictions = tried_fav_neighbors_fl_agg_model_predictions
-        # Note - when there is no tried neighbor, a tried_fav_neighbors_fl_agg_model will also be saved, but won't used in the next round
+        # Note - when there is no tried neighbor, a tried_fav_neighbors_fl_agg_model will also be saved, but won't used in the next round.
         detector.update_and_save_model(tried_fav_neighbors_fl_agg_model, comm_round, tried_fav_neighbors_fl_agg_model_path)
         
         # if heuristic is randomly choosing candidate neighbors, reshuffle
@@ -500,6 +534,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             last_rounds_error = detector.neighbor_fl_error_records[-(config_vars['kick_rounds'] + 1):]
             if all(x<y for x, y in zip(last_rounds_error, last_rounds_error[1:])):
                 if_kick = True
+
+        if Detector.reset_mem:
+            if_kick = False
+
         # kick
         if if_kick:
             kick_nums = []
@@ -532,6 +570,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 
         # at the end of FL for loop
         detecotr_iter += 1
+
+    if Detector.reset_mem:
+        Detector.training_data_starting_index = training_data_ending_index + 1
     
     print(f"Saving progress for comm_round {comm_round}...")
     
