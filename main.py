@@ -67,6 +67,7 @@ parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for
 parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm comm_round for FL')
 parser.add_argument('-ff', '--num_feedforward', type=int, default=12, help='number of feedforward predictions, used to set up the number of the last layer of the model (usually it has to be equal to -il)')
 parser.add_argument('-tp', '--train_percent', type=float, default=1.0, help='percentage of the data for training')
+parser.add_argument('-la', '--learning_attribute', type=str, default='Avg Speed', help='what attribute in the dataset to learn')
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
@@ -228,7 +229,7 @@ else:
         detector_fav_neighbors[detector_id] = []
     
     ''' get scaler '''
-    scaler = get_scaler(pd.concat(list(whole_data_record.values())))
+    scaler = get_scaler(pd.concat(list(whole_data_record.values())), config_vars["learning_attribute"])
     config_vars["scaler"] = scaler
     
     ''' save used arguments as a text file for easy review '''
@@ -302,10 +303,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
 
         ''' Process test data '''
         # process training data
-        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH)
+        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, config_vars["learning_attribute"])
         # process test data
-        X_test, _ = process_test(test_data, scaler, INPUT_LENGTH)
-        _, y_true = process_test_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'])
+        X_test, _ = process_test(test_data, scaler, INPUT_LENGTH, config_vars["learning_attribute"])
+        _, y_true = process_test_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'], config_vars["learning_attribute"])
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))
