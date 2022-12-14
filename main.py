@@ -402,7 +402,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         if Detector.reset_mem:
             # no prediction this round
             print(f"{detector_id} mem reset. No naive_fl prediction this round.")
-            detector_predicts[detector_id]['stand_alone'].append((comm_round + 1, np.full_like(y_true, np.nan)))
+            detector_predicts[detector_id]['naive_fl'].append((comm_round + 1, np.full_like(y_true, np.nan)))
         else: # TODO
             # do prediction
             print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")

@@ -264,9 +264,9 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
           annotation_color_fav_vs_standalone = 'black'
 
         # annotate fav_vs_naive
-        subplots.annotate(f"N:{fav_better_percent_string_fav_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.65), size=8, color=annotation_color_fav_vs_naive)
+        subplots.annotate(f"FN:{fav_better_percent_string_fav_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.65), size=8, color=annotation_color_fav_vs_naive)
         # annotate fav_vs_standalone
-        subplots.annotate(f"S:{fav_better_percent_string_fav_vs_standalone}", xy=(num_of_plot_points * 0.6, ylim * 0.6), size=8, color=annotation_color_fav_vs_standalone)
+        subplots.annotate(f"FS:{fav_better_percent_string_fav_vs_standalone}", xy=(num_of_plot_points * 0.6, ylim * 0.6), size=8, color=annotation_color_fav_vs_standalone)
 
 
         '''
@@ -283,14 +283,19 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         
         subplots.plot(range(len(model_error_normalized['naive_fl'][error_to_plot])), model_error_normalized['naive_fl'][error_to_plot], label='naive_fl', color='#5a773a')
 
+        subplots.plot(range(len(model_error_normalized['same_dir_fl'][error_to_plot])), model_error_normalized['same_dir_fl'][error_to_plot], label='same_dir_fl', color='orange')
+
         subplots.plot(range(len(model_error_normalized['fav_neighbors_fl'][error_to_plot])), model_error_normalized['fav_neighbors_fl'][error_to_plot], label='fav_neighbors_fl', color='blue')
+
+        
         
         if sensor_plot_iter == 0:   
           baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
           global_curve = mlines.Line2D([], [], color='#5a773a', label="BFRT")
+          same_dir_curve = mlines.Line2D([], [], color='orange', label="SAME_DIR")
           fav_neighbors_fl_curve = mlines.Line2D([], [], color='blue', label="KFRT")
         
-          subplots.legend(handles=[baseline_curve, global_curve, fav_neighbors_fl_curve], loc='best', prop={'size': 10})
+          subplots.legend(handles=[baseline_curve, global_curve, same_dir_curve, fav_neighbors_fl_curve], loc='best', prop={'size': 10})
     # show legend on each plot
     # baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
     # global_curve = mlines.Line2D([], [], color='#5a773a', label="FED")    
