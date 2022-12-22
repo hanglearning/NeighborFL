@@ -248,10 +248,14 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         subplots.plot(range(0, num_of_plot_points), model_error_normalized['stand_alone'][error_to_plot], label='stand_alone', color='#ffb839')
 
         
-        # compare naive_fl vs. fav_neighbors_fl and show smaller-error-value percentage, normalized
+        # compare naive_fl vs. fav_neighbors_fl and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put what we expect to surpass as the first argument.
         fav_better_percent_val_fav_vs_naive, fav_better_percent_string_fav_vs_naive = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
         # same for standalone vs. fav_neighbors_fl
-        fav_better_percent_val_fav_vs_standalone, fav_better_percent_string_fav_vs_standalone = compare_l1_smaller_equal_percent(model_error_normalized['stand_alone'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
+        fav_better_percent_val_fav_vs_standalone, fav_better_percent_string_fav_vs_standalone = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['stand_alone'][error_to_plot])
+        # same for same_dir_fl vs. fav_neighbors_fl
+        fav_better_percent_val_fav_vs_same_dir, fav_better_percent_string_fav_vs_same_dir = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['same_dir_fl'][error_to_plot])
+        # compare same_dir_fl vs. native_fl
+        same_dir_percent_val_same_dir_vs_naive, same_dir_percent_string_same_dir_vs_naive = compare_l1_smaller_equal_percent(model_error_normalized['same_dir_fl'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
 
         if fav_better_percent_val_fav_vs_naive >= 0.5:
           annotation_color_fav_vs_naive = 'red'
@@ -263,10 +267,23 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         else:
           annotation_color_fav_vs_standalone = 'black'
 
+        if fav_better_percent_val_fav_vs_same_dir >= 0.5:
+          annotation_color_fav_vs_same_dir = 'red'
+        else:
+          annotation_color_fav_vs_same_dir = 'black'
+
+        if same_dir_percent_val_same_dir_vs_naive >= 0.5:
+          annotation_color_same_dir_vs_naive = 'red'
+        else:
+          annotation_color_same_dir_vs_naive = 'black'
+
         # annotate fav_vs_naive
-        subplots.annotate(f"FN:{fav_better_percent_string_fav_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.65), size=8, color=annotation_color_fav_vs_naive)
+        subplots.annotate(f">BFRT:{fav_better_percent_string_fav_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.65), size=8, color=annotation_color_fav_vs_naive)
         # annotate fav_vs_standalone
-        subplots.annotate(f"FS:{fav_better_percent_string_fav_vs_standalone}", xy=(num_of_plot_points * 0.6, ylim * 0.6), size=8, color=annotation_color_fav_vs_standalone)
+        subplots.annotate(f">BASE:{fav_better_percent_string_fav_vs_standalone}", xy=(num_of_plot_points * 0.6, ylim * 0.6), size=8, color=annotation_color_fav_vs_standalone)
+        # annotate fav_vs_standalone
+        subplots.annotate(f">SAME:{fav_better_percent_string_fav_vs_same_dir}", xy=(num_of_plot_points * 0.6, ylim * 0.55), size=8, color=annotation_color_fav_vs_same_dir)
+        subplots.annotate(f"SD>FL:{same_dir_percent_string_same_dir_vs_naive}", xy=(num_of_plot_points * 0.6, ylim * 0.5), size=8, color=annotation_color_same_dir_vs_naive)
 
 
         '''
@@ -283,7 +300,7 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         
         subplots.plot(range(len(model_error_normalized['naive_fl'][error_to_plot])), model_error_normalized['naive_fl'][error_to_plot], label='naive_fl', color='#5a773a')
 
-        subplots.plot(range(len(model_error_normalized['same_dir_fl'][error_to_plot])), model_error_normalized['same_dir_fl'][error_to_plot], label='same_dir_fl', color='orange')
+        subplots.plot(range(len(model_error_normalized['same_dir_fl'][error_to_plot])), model_error_normalized['same_dir_fl'][error_to_plot], label='same_dir_fl', color='pink')
 
         subplots.plot(range(len(model_error_normalized['fav_neighbors_fl'][error_to_plot])), model_error_normalized['fav_neighbors_fl'][error_to_plot], label='fav_neighbors_fl', color='blue')
 
@@ -292,7 +309,7 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         if sensor_plot_iter == 0:   
           baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
           global_curve = mlines.Line2D([], [], color='#5a773a', label="BFRT")
-          same_dir_curve = mlines.Line2D([], [], color='orange', label="SAME_DIR")
+          same_dir_curve = mlines.Line2D([], [], color='pink', label="SAME_DIR")
           fav_neighbors_fl_curve = mlines.Line2D([], [], color='blue', label="KFRT")
         
           subplots.legend(handles=[baseline_curve, global_curve, same_dir_curve, fav_neighbors_fl_curve], loc='best', prop={'size': 10})

@@ -267,6 +267,18 @@ else:
     print(f"\nNote: the provided dataset allows running for maximum {max_comm_rounds} comm rounds.")
     run_comm_rounds = max_comm_rounds
 
+# overwrite other variables while resuming
+try:
+    if config_vars["training_data_starting_index"]:
+        Detector.training_data_starting_index = config_vars["training_data_starting_index"]
+
+    if config_vars["reset_mem"] == False:
+        Detector.reset_mem = False
+except:
+    pass
+
+
+
 print(f"Starting Federated Learning with total comm rounds {run_comm_rounds}...")
 
 for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
@@ -589,6 +601,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     
     print("Saving Resume Params...")
     config_vars["resume_comm_round"] = comm_round + 1
+    config_vars["reset_mem"] = Detector.reset_mem
+    config_vars["training_data_starting_index"] = Detector.training_data_starting_index
     with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'wb') as f:
         pickle.dump(config_vars, f)
     with open(f"{logs_dirpath}/check_point/list_of_detectors.pkl", 'wb') as f:
