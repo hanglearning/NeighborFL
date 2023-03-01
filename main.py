@@ -168,7 +168,7 @@ else:
     list_of_detectors = {}
     for detector_file_iter in range(len(all_detector_files)):
         detector_file_name = all_detector_files[detector_file_iter]
-        detector_id = detector_file_name.split('-')[-1].strip().split(".")[0]
+        sensor_id = detector_file_name.split('-')[-1].strip().split(".")[0]
         # data file path
         file_path = os.path.join(config_vars['dataset_path'], detector_file_name)
         
@@ -179,10 +179,10 @@ else:
         
         whole_data = whole_data[:read_to_line]
         print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
-        whole_data_record[detector_id] = whole_data
+        whole_data_record[sensor_id] = whole_data
         # create a detector object
-        detector = Detector(detector_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.device_id==detector_id.split('_')[0]]['lat']), longitude=float(detector_locations[detector_locations.device_id==detector_id.split('_')[0]]['lon']),direction=detector_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
-        list_of_detectors[detector_id] = detector
+        detector = Detector(sensor_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['latitude']), longitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['longitude']),direction=sensor_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
+        list_of_detectors[sensor_id] = detector
     config_vars["individual_min_data_sample"] = individual_min_data_sample
     
     # save dataset record for resume purpose
@@ -190,7 +190,7 @@ else:
         pickle.dump(whole_data_record, f)
         
     ''' detector assign neighbors (candidate fav neighbors) '''
-    for detector_id, detector in list_of_detectors.items():
+    for sensor_id, detector in list_of_detectors.items():
         detector.assign_neighbors(list_of_detectors)
     
     ''' detector init models '''
@@ -205,27 +205,27 @@ else:
     global_model_0_path = f'{Detector.logs_dirpath}/{naive_fl_global_model_path}/comm_0.h5'
     global_model_0.save(global_model_0_path)
     # init models
-    for detector_id, detector in list_of_detectors.items():
+    for sensor_id, detector in list_of_detectors.items():
         detector.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
         
     ''' init prediction records and fav_neighbor records'''
     detector_predicts = {}
     detector_fav_neighbors = {}
     for detector_file in all_detector_files:
-        detector_id = detector_file.split('-')[-1].strip().split(".")[0]
-        detector_predicts[detector_id] = {}
+        sensor_id = detector_file.split('-')[-1].strip().split(".")[0]
+        detector_predicts[sensor_id] = {}
         # baseline 1 - stand_alone
-        detector_predicts[detector_id]['stand_alone'] = []
+        detector_predicts[sensor_id]['stand_alone'] = []
         # baseline 2 - naive global
-        detector_predicts[detector_id]['naive_fl'] = []
+        detector_predicts[sensor_id]['naive_fl'] = []
         # fav_neighbors_fl model
-        detector_predicts[detector_id]['fav_neighbors_fl'] = []
+        detector_predicts[sensor_id]['fav_neighbors_fl'] = []
         # same_dir_fl model
-        detector_predicts[detector_id]['same_dir_fl'] = []
+        detector_predicts[sensor_id]['same_dir_fl'] = []
         # true
-        detector_predicts[detector_id]['true'] = []
+        detector_predicts[sensor_id]['true'] = []
         # fav_neighbor records
-        detector_fav_neighbors[detector_id] = []
+        detector_fav_neighbors[sensor_id] = []
     
     ''' get scaler '''
     scaler = get_scaler(pd.concat(list(whole_data_record.values())))
@@ -290,15 +290,15 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     test_data_ending_index_chained_multi = test_data_starting_index + new_sample_size_per_comm_round - 1
     
     detecotr_iter = 1
-    for detector_id, detector in list_of_detectors.items():
+    for sensor_id, detector in list_of_detectors.items():
         ''' Process traning data '''
         # slice training data
-        train_data = whole_data_record[detector_id][training_data_starting_index: training_data_ending_index + 1]
+        train_data = whole_data_record[sensor_id][training_data_starting_index: training_data_ending_index + 1]
         # process training data
         X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH)
         ''' Process test data '''
         # slice test data
-        test_data = whole_data_record[detector_id][test_data_starting_index: test_data_ending_index_one_step + 1]
+        test_data = whole_data_record[sensor_id][test_data_starting_index: test_data_ending_index_one_step + 1]
         # process test data
         X_test, _ = process_test_one_step(test_data, scaler, INPUT_LENGTH)
         _, y_true = process_test_multi_and_get_y_true(test_data, scaler, INPUT_LENGTH, config_vars['num_feedforward'])
@@ -309,32 +309,32 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # record data
         detector.set_X_test(X_test)
         detector.set_y_true(y_true)
-        detector_predicts[detector_id]['true'].append((comm_round + 1,y_true))
+        detector_predicts[sensor_id]['true'].append((comm_round + 1,y_true))
         
         ''' Training '''
         ''' Baselines'''
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
+        print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
-        print(f"{detector_id} training stand_alone model.. (1/4)")
+        print(f"{sensor_id} training stand_alone model.. (1/4)")
         new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, stand_alone_model_path)
         # naive_fl local model
-        print(f"{detector_id} training naive_fl local model.. (2/4)")
+        print(f"{sensor_id} training naive_fl local model.. (2/4)")
         new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
         # same dir fedavg local model
-        print(f"{detector_id} training same_dir_fl local model.. (3/4)")
+        print(f"{sensor_id} training same_dir_fl local model.. (3/4)")
         new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
         ''' fav_neighbors_fl (core algorithm)'''
         # fav_neighbors_fl local model
-        print(f"{detector_id} training fav_neighbors_fl local model.. (4/4)")
+        print(f"{sensor_id} training fav_neighbors_fl local model.. (4/4)")
         chosen_model = detector.get_last_fav_neighbors_fl_agg_model() # by default
         if comm_round > 1:
             error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
             detector.neighbor_fl_error_records.append(error_without_new_neighbors)
         if detector.tried_neighbors:
-            print(f"{detector_id} comparing models with and without tried neighbor(s) to determine which model to train...")
+            print(f"{sensor_id} comparing models with and without tried neighbor(s) to determine which model to train...")
             error_with_new_neighbors = get_error(y_true, detector.tried_fav_neighbors_fl_predictions)
             error_diff = error_without_new_neighbors - error_with_new_neighbors
             if error_diff > 0:
@@ -358,14 +358,14 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detector.update_and_save_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
         # record current comm_round of fav_neighbors for visualization
         current_fav_neighbors = set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)
-        detector_fav_neighbors[detector_id].append(current_fav_neighbors)
-        print(f"{detector_id}'s current fav neighbors are {current_fav_neighbors}.")
+        detector_fav_neighbors[sensor_id].append(current_fav_neighbors)
+        print(f"{sensor_id}'s current fav neighbors are {current_fav_neighbors}.")
         
         ''' stand_alone model predictions '''
-        print(f"{detector_id} is now predicting by its stand_alone model...")
+        print(f"{sensor_id} is now predicting by its stand_alone model...")
         stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
         stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
+        detector_predicts[sensor_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
 
         detecotr_iter += 1
         
@@ -374,22 +374,22 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     print("Predicting on naive fl model")
     new_naive_fl_global_model = create_model(model_units, model_configs)
     naive_fl_local_models_weights = []
-    for detector_id, detector in list_of_detectors.items():
+    for sensor_id, detector in list_of_detectors.items():
         naive_fl_local_models_weights.append(detector.get_naive_fl_local_model().get_weights())
     new_naive_fl_global_model.set_weights(np.mean(naive_fl_local_models_weights, axis=0))
     # save new_naive_fl_global_model
     Detector.save_fl_global_model(new_naive_fl_global_model, comm_round, naive_fl_global_model_path)
     
     detecotr_iter = 1
-    for detector_id, detector in list_of_detectors.items():
+    for sensor_id, detector in list_of_detectors.items():
         # update new_naive_fl_global_model
         detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
         # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
+        print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model")
         new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
         new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
-        detector_predicts[detector_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
+        detector_predicts[sensor_id]['naive_fl'].append((comm_round + 1,new_naive_fl_global_model_predictions))
         detecotr_iter += 1
 
     ''' Simulate Same Dir FedAvg '''
@@ -400,8 +400,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     N_dir_fedavg_local_models_weights = []
     S_dir_fedavg_local_models_weights = []
     
-    for detector_id, detector in list_of_detectors.items():
-        if detector_id.split('_')[1] == 'N':
+    for sensor_id, detector in list_of_detectors.items():
+        if sensor_id.split('_')[1] == 'N':
             N_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
         else:
             S_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
@@ -412,8 +412,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fl_global_model_path)
     
     detecotr_iter = 1
-    for detector_id, detector in list_of_detectors.items():
-        if detector_id.split('_')[1] == 'N':
+    for sensor_id, detector in list_of_detectors.items():
+        if sensor_id.split('_')[1] == 'N':
             same_dir_fl_global_model_path = N_dir_fl_global_model_path
             new_same_dir_fl_global_model = N_dir_fedavg_global_model
         else:
@@ -422,18 +422,18 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # update new_same_dir_fl_global_model
         detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
         # do prediction
-        print(f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
+        print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
         new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
         new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector
-        detector_predicts[detector_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
+        detector_predicts[sensor_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
         detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
     # determine if add new neighbor or not (core algorithm)
     detecotr_iter = 1
-    for detector_id, detector in list_of_detectors.items():
-        print_text = f"{detector_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL"
+    for sensor_id, detector in list_of_detectors.items():
+        print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL"
         print('-' * len(print_text))
         print(print_text)
         
@@ -446,10 +446,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # save model
         detector.update_and_save_model(fav_neighbors_fl_agg_model, comm_round, fav_neighbors_fl_agg_model_path)
         # do prediction
-        print(f"{detector_id} now predicting by its fav_neighbors_fl_agg_model.")
+        print(f"{sensor_id} now predicting by its fav_neighbors_fl_agg_model.")
         fav_neighbors_fl_agg_model_predictions = fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[detector_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
+        detector_predicts[sensor_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
         ''' if len(fav_neighbors) < k, try new neighbors! '''
@@ -474,14 +474,14 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         candidate_iter += 1
                         continue
                 detector.tried_neighbors.append(candidate_fav)
-                print(f"{detector_id} selects {candidate_fav.id} as a new potential neighbor.")
+                print(f"{sensor_id} selects {candidate_fav.id} as a new potential neighbor.")
                 fav_neighbors_fl_agg_models_weights.append(candidate_fav.get_fav_neighbors_fl_local_model().get_weights())
                 candidate_count -= 1
             candidate_iter += 1
                     
         tried_fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
         # do prediction
-        print(f"{detector_id} now predicting by the tried_fav_neighbors_fl_agg_model (has the model from the newly tried neighbor(s)).")
+        print(f"{sensor_id} now predicting by the tried_fav_neighbors_fl_agg_model (has the model from the newly tried neighbor(s)).")
         tried_fav_neighbors_fl_agg_model_predictions = tried_fav_neighbors_fl_agg_model.predict(detector.get_X_test())
         tried_fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(tried_fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
         detector.tried_fav_neighbors_fl_predictions = tried_fav_neighbors_fl_agg_model_predictions
@@ -516,7 +516,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         to_kick_id = rep_tuples[i][0]
                         if list_of_detectors[to_kick_id] in detector.fav_neighbors:
                             detector.fav_neighbors.remove(list_of_detectors[to_kick_id])
-                            print(f"{detector_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
+                            print(f"{sensor_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                             kick_num -= 1
                     else:
                         break
@@ -525,7 +525,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 for i in range(len(rep_tuples)):
                     if kick_num > 0:
                         kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
-                        print(f"{detector_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
+                        print(f"{sensor_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                         kick_num -= 1
                     else:
                         break
