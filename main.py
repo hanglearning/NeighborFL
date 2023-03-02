@@ -401,7 +401,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     S_dir_fedavg_local_models_weights = []
     
     for sensor_id, detector in list_of_detectors.items():
-        if sensor_id.split('_')[1] == 'N':
+        if sensor_id.split('_')[1] == 'NB':
             N_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
         else:
             S_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
