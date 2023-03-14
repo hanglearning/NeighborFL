@@ -513,6 +513,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     kicked = detector.fav_neighbors.pop()
                     print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                     del fav_neighbors_fl_agg_models_weights[kicked.id]
+                    # add retry interval experiment shows that later in try phase, the same neighbor may be tried again
+                    detector.neighbor_to_last_accumulate[neighbor.id] = comm_round - 1
+                    detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
+
 
         ''' if len(fav_neighbors) < k, try new neighbors! '''
         try_new_neighbors = False
