@@ -75,16 +75,20 @@ parser.add_argument('-ms', '--max_data_size', type=int, default=24, help='maximu
 # arguments for fav_neighbor fl
 parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
 parser.add_argument('-k', '--k', type=float, default=None, help='maximum number of fav_neighbors. radius and k can be used together, but radius has the priority')
-parser.add_argument('-et', '--error_type', type=str, default="MAPE", help='the error type to evaluate potential neighbors')
+parser.add_argument('-et', '--error_type', type=str, default="MSE", help='the error type to evaluate potential neighbors')
 parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to try in each comm_round')
 parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heuristic to add fav neighbors: 1 - add by distance from close to far, 2 - add randomly')
 # arguments for fav_neighbor kicking
 parser.add_argument('-kt', '--kick_trigger', type=int, default=2, help='to trigger a kick: 0 - never kick; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -kr')
 parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -kt 1, detector has a probability to kick out worst neighbors to explore new neighbors')
-parser.add_argument('-kr', '--kick_rounds', type=int, default=3, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for this number of rounds")
-parser.add_argument('-kn', '--kick_num', type=int, default=None, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
+parser.add_argument('-kr', '--kick_rounds', type=int, default=1, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for -kr number of rounds")
+parser.add_argument('-kn', '--kick_num', type=int, default=1, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
 parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='this number defines how many percent of of neighboring detecotors to kick having the worst reputation.  Default to 0.25.  Either this or -kn has to be specified, if both specified, randomly chosen')
-parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly')
+parser.add_argument('-ks', '--kick_strategy', type=int, default=3, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')
+
+# argument for same_dir_fl
+parser.add_argument('-sdfl', '--same_dir_fl', type=int, default=0, help='1 - enable same_dir_fl; 0 - disable')
+
 
 args = parser.parse_args()
 args = args.__dict__
@@ -221,7 +225,8 @@ else:
         # fav_neighbors_fl model
         detector_predicts[sensor_id]['fav_neighbors_fl'] = []
         # same_dir_fl model
-        detector_predicts[sensor_id]['same_dir_fl'] = []
+        if args["same_dir_fl"]:
+            detector_predicts[sensor_id]['same_dir_fl'] = []
         # true
         detector_predicts[sensor_id]['true'] = []
         # fav_neighbor records
@@ -323,16 +328,23 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
         # same dir fedavg local model
-        print(f"{sensor_id} training same_dir_fl local model.. (3/4)")
-        new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
-        detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
+        if args["same_dir_fl"]:
+            print(f"{sensor_id} training same_dir_fl local model.. (3/4)")
+            new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
+            detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
+        else:
+            print(f"{sensor_id} Same Dir FL local model skipped. (3/4)")
         ''' fav_neighbors_fl (core algorithm)'''
         # fav_neighbors_fl local model
+        detector.has_added_neigbor = False
         print(f"{sensor_id} training fav_neighbors_fl local model.. (4/4)")
         chosen_model = detector.get_last_fav_neighbors_fl_agg_model() # by default
         if comm_round > 1:
             error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
-            detector.neighbor_fl_error_records.append(error_without_new_neighbors)
+            
+            fav_neighbors_fl_error = error_without_new_neighbors
+            detector.neighbor_fl_error_records.append(fav_neighbors_fl_error)
+            
         if detector.tried_neighbors:
             print(f"{sensor_id} comparing models with and without tried neighbor(s) to determine which model to train...")
             error_with_new_neighbors = get_error(y_true, detector.tried_fav_neighbors_fl_predictions)
@@ -345,6 +357,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 if error_diff > 0:
                     # tried neighbors are good
                     detector.fav_neighbors.append(neighbor)
+                    detector.has_added_neigbor = True
                     print(f"{detector.id} added {neighbor.id} to its fav neighbors!")
                 else:
                     # tried neighbors are bad
@@ -352,7 +365,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     detector.neighbor_to_last_accumulate[neighbor.id] = comm_round - 1
                     detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
                 # give reputation
-                detector.neighbors_to_rep_score[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + error_diff
+                # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
+                # detector.neighbors_to_rep_score[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + error_diff
            
         new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
@@ -393,41 +407,42 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detecotr_iter += 1
 
     ''' Simulate Same Dir FedAvg '''
-    # create naive_fl model from all naive_fl_local models
-    print("Predicting on Same Dir FedAvg model")
-    N_dir_fedavg_global_model = create_model(model_units, model_configs)
-    S_dir_fedavg_global_model = create_model(model_units, model_configs)
-    N_dir_fedavg_local_models_weights = []
-    S_dir_fedavg_local_models_weights = []
-    
-    for sensor_id, detector in list_of_detectors.items():
-        if sensor_id.split('_')[1] == 'NB':
-            N_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
-        else:
-            S_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
-    N_dir_fedavg_global_model.set_weights(np.mean(N_dir_fedavg_local_models_weights, axis=0))
-    S_dir_fedavg_global_model.set_weights(np.mean(S_dir_fedavg_local_models_weights, axis=0))
-    # save new_naive_fl_global_model
-    Detector.save_N_global_model(N_dir_fedavg_global_model, comm_round, N_dir_fl_global_model_path)
-    Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fl_global_model_path)
-    
-    detecotr_iter = 1
-    for sensor_id, detector in list_of_detectors.items():
-        if sensor_id.split('_')[1] == 'N':
-            same_dir_fl_global_model_path = N_dir_fl_global_model_path
-            new_same_dir_fl_global_model = N_dir_fedavg_global_model
-        else:
-            same_dir_fl_global_model_path = S_dir_fl_global_model_path
-            new_same_dir_fl_global_model = S_dir_fedavg_global_model
-        # update new_same_dir_fl_global_model
-        detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
-        # do prediction
-        print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
-        new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
-        new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector
-        detector_predicts[sensor_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
-        detecotr_iter += 1
+    if args["same_dir_fl"]:
+        # create naive_fl model from all naive_fl_local models
+        print("Predicting on Same Dir FedAvg model")
+        N_dir_fedavg_global_model = create_model(model_units, model_configs)
+        S_dir_fedavg_global_model = create_model(model_units, model_configs)
+        N_dir_fedavg_local_models_weights = []
+        S_dir_fedavg_local_models_weights = []
+        
+        for sensor_id, detector in list_of_detectors.items():
+            if sensor_id.split('_')[1] == 'NB':
+                N_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
+            else:
+                S_dir_fedavg_local_models_weights.append(detector.get_same_dir_fl_local_model().get_weights())
+        N_dir_fedavg_global_model.set_weights(np.mean(N_dir_fedavg_local_models_weights, axis=0))
+        S_dir_fedavg_global_model.set_weights(np.mean(S_dir_fedavg_local_models_weights, axis=0))
+        # save new_naive_fl_global_model
+        Detector.save_N_global_model(N_dir_fedavg_global_model, comm_round, N_dir_fl_global_model_path)
+        Detector.save_S_global_model(S_dir_fedavg_global_model, comm_round, S_dir_fl_global_model_path)
+        
+        detecotr_iter = 1
+        for sensor_id, detector in list_of_detectors.items():
+            if sensor_id.split('_')[1] == 'N':
+                same_dir_fl_global_model_path = N_dir_fl_global_model_path
+                new_same_dir_fl_global_model = N_dir_fedavg_global_model
+            else:
+                same_dir_fl_global_model_path = S_dir_fl_global_model_path
+                new_same_dir_fl_global_model = S_dir_fedavg_global_model
+            # update new_same_dir_fl_global_model
+            detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
+            # do prediction
+            print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model")
+            new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
+            new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+            detector
+            detector_predicts[sensor_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
+            detecotr_iter += 1
     
     ''' Simulate fav_neighbor FL FedAvg '''    
     # determine if add new neighbor or not (core algorithm)
@@ -496,7 +511,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         if_kick = False
         if config_vars["kick_trigger"] == 1 and random.random() <= config_vars['epsilon']:
             if_kick = True
-        if config_vars["kick_trigger"] == 2 and comm_round > config_vars['kick_rounds']:
+        if config_vars["kick_trigger"] == 2 and len(detector.neighbor_fl_error_records) > config_vars['kick_rounds'] and not detector.has_added_neigbor:
             last_rounds_error = detector.neighbor_fl_error_records[-(config_vars['kick_rounds'] + 1):]
             if all(x<y for x, y in zip(last_rounds_error, last_rounds_error[1:])):
                 if_kick = True
@@ -511,6 +526,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
             if config_vars["kick_strategy"] == 1:
                 # kick by lowest reputation
+                pass # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
                 for i in range(len(rep_tuples)):
                     if kick_num > 0:
                         to_kick_id = rep_tuples[i][0]
@@ -529,6 +545,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         kick_num -= 1
                     else:
                         break
+            elif config_vars["kick_strategy"] == 3:
+                # always kick the last added one
+                if len(detector.fav_neighbors) > 0:
+                    kicked = detector.fav_neighbors.pop()
+                    print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                 
         # at the end of FL for loop
         detecotr_iter += 1

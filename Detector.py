@@ -39,6 +39,7 @@ class Detector:
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
         self.neighbor_fl_error_records = []
+        self.has_added_neigbor = False # used as one of the conditions to determine whether to kick a fav neighbor
 
     def assign_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():
