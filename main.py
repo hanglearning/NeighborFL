@@ -454,10 +454,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         
         # create fav_neighbors_fl_agg_model based on the current fav neighbors
         fav_neighbors_fl_agg_model = create_model(model_units, model_configs)
-        fav_neighbors_fl_agg_models_weights = [detector.get_fav_neighbors_fl_local_model().get_weights()]
+        fav_neighbors_fl_agg_models_weights = {}
+        fav_neighbors_fl_agg_models_weights[detector.id] = detector.get_fav_neighbors_fl_local_model().get_weights()
         for fav_neighbor in detector.fav_neighbors:
-            fav_neighbors_fl_agg_models_weights.append(fav_neighbor.get_fav_neighbors_fl_local_model().get_weights())
-        fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
+            fav_neighbors_fl_agg_models_weights[fav_neighbor.id] = fav_neighbor.get_fav_neighbors_fl_local_model().get_weights()
+        fav_neighbors_fl_agg_model.set_weights(np.mean(list(fav_neighbors_fl_agg_models_weights.values()), axis=0))
         # save model
         detector.update_and_save_model(fav_neighbors_fl_agg_model, comm_round, fav_neighbors_fl_agg_model_path)
         # do prediction
@@ -467,45 +468,6 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         detector_predicts[sensor_id]['fav_neighbors_fl'].append((comm_round + 1,fav_neighbors_fl_agg_model_predictions))
         detector.fav_neighbors_fl_predictions = fav_neighbors_fl_agg_model_predictions
         
-        ''' if len(fav_neighbors) < k, try new neighbors! '''
-        try_new_neighbors = False
-        if detector.k:
-            if len(detector.fav_neighbors) < detector.k:
-                try_new_neighbors = True
-        else:
-            try_new_neighbors = True
-        
-        tried_fav_neighbors_fl_agg_model = create_model(model_units, model_configs)
-        detector.tried_neighbors = []
-        candidate_count = min(config_vars['num_neighbors_try'], len(detector.neighbors) - len(detector.fav_neighbors))
-        candidate_iter = 0
-        while candidate_count > 0 and try_new_neighbors and candidate_iter < len(detector.neighbors):
-            # k may be set to a very large number, so checking candidate_count is still necessary
-            candidate_fav = detector.neighbors[candidate_iter][0]
-            if candidate_fav not in detector.fav_neighbors:
-                if candidate_fav.id in detector.neighbor_to_last_accumulate:
-                    if comm_round <= detector.neighbor_to_last_accumulate[candidate_fav.id] + detector.neighbor_to_accumulate_interval[candidate_fav.id]:
-                        # skip this detector
-                        candidate_iter += 1
-                        continue
-                detector.tried_neighbors.append(candidate_fav)
-                print(f"{sensor_id} selects {candidate_fav.id} as a new potential neighbor.")
-                fav_neighbors_fl_agg_models_weights.append(candidate_fav.get_fav_neighbors_fl_local_model().get_weights())
-                candidate_count -= 1
-            candidate_iter += 1
-                    
-        tried_fav_neighbors_fl_agg_model.set_weights(np.mean(fav_neighbors_fl_agg_models_weights, axis=0))
-        # do prediction
-        print(f"{sensor_id} now predicting by the tried_fav_neighbors_fl_agg_model (has the model from the newly tried neighbor(s)).")
-        tried_fav_neighbors_fl_agg_model_predictions = tried_fav_neighbors_fl_agg_model.predict(detector.get_X_test())
-        tried_fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(tried_fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector.tried_fav_neighbors_fl_predictions = tried_fav_neighbors_fl_agg_model_predictions
-        # Note - when there is no tried neighbor, a tried_fav_neighbors_fl_agg_model will also be saved, but won't used in the next round
-        detector.update_and_save_model(tried_fav_neighbors_fl_agg_model, comm_round, tried_fav_neighbors_fl_agg_model_path)
-        
-        # if heuristic is randomly choosing candidate neighbors, reshuffle
-        if config_vars["add_heuristic"] == 2:
-            detector.neighbors = random.shuffle(detector.neighbors)
         
         ''' kick some fav neighbors by rolling a dice and strategy '''
         if_kick = False
@@ -550,9 +512,52 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 if len(detector.fav_neighbors) > 0:
                     kicked = detector.fav_neighbors.pop()
                     print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
+                    del fav_neighbors_fl_agg_models_weights[kicked.id]
+
+        ''' if len(fav_neighbors) < k, try new neighbors! '''
+        try_new_neighbors = False
+        if detector.k:
+            if len(detector.fav_neighbors) < detector.k:
+                try_new_neighbors = True
+        else:
+            try_new_neighbors = True
+        
+        tried_fav_neighbors_fl_agg_model = create_model(model_units, model_configs)
+        detector.tried_neighbors = []
+        candidate_count = min(config_vars['num_neighbors_try'], len(detector.neighbors) - len(detector.fav_neighbors))
+        candidate_iter = 0
+        while candidate_count > 0 and try_new_neighbors and candidate_iter < len(detector.neighbors):
+            # k may be set to a very large number, so checking candidate_count is still necessary
+            candidate_fav = detector.neighbors[candidate_iter][0]
+            if candidate_fav not in detector.fav_neighbors:
+                if candidate_fav.id in detector.neighbor_to_last_accumulate:
+                    if comm_round <= detector.neighbor_to_last_accumulate[candidate_fav.id] + detector.neighbor_to_accumulate_interval[candidate_fav.id]:
+                        # skip this detector
+                        candidate_iter += 1
+                        continue
+                detector.tried_neighbors.append(candidate_fav)
+                print(f"{sensor_id} selects {candidate_fav.id} as a new potential neighbor.")
+                fav_neighbors_fl_agg_models_weights[candidate_fav.id] = candidate_fav.get_fav_neighbors_fl_local_model().get_weights()
+                candidate_count -= 1
+            candidate_iter += 1
+                    
+        tried_fav_neighbors_fl_agg_model.set_weights(np.mean(list(fav_neighbors_fl_agg_models_weights.values()), axis=0))
+        # do prediction
+        print(f"{sensor_id} now predicting by the tried_fav_neighbors_fl_agg_model (has the model from the newly tried neighbor(s)).")
+        tried_fav_neighbors_fl_agg_model_predictions = tried_fav_neighbors_fl_agg_model.predict(detector.get_X_test())
+        tried_fav_neighbors_fl_agg_model_predictions = scaler.inverse_transform(tried_fav_neighbors_fl_agg_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+        detector.tried_fav_neighbors_fl_predictions = tried_fav_neighbors_fl_agg_model_predictions
+        # Note - when there is no tried neighbor, a tried_fav_neighbors_fl_agg_model will also be saved, but won't used in the next round
+        detector.update_and_save_model(tried_fav_neighbors_fl_agg_model, comm_round, tried_fav_neighbors_fl_agg_model_path)
+        
+        # if heuristic is randomly choosing candidate neighbors, reshuffle
+        if config_vars["add_heuristic"] == 2:
+            detector.neighbors = random.shuffle(detector.neighbors)
                 
-        # at the end of FL for loop
+        ''' at the end of FL for loop '''
         detecotr_iter += 1
+
+    
     
     print(f"Saving progress for comm_round {comm_round}...")
     
