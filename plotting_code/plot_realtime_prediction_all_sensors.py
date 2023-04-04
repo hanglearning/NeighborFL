@@ -36,7 +36,7 @@ parser.add_argument('-v', '--version', type=str, default='c', help='c for ccgrid
 parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. By default, it is kind of random')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
-parser.add_argument('-attr', '--attribute', type=str, default='Volume', help='prediciting feature')
+parser.add_argument('-attr', '--attribute', type=str, default='Speed', help='prediciting feature')
 
 
 args = parser.parse_args()
