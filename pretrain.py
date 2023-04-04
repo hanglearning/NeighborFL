@@ -86,14 +86,14 @@ for detector_file_iter in range(len(all_detector_files)):
     ''' get scaler '''
     scaler = get_scaler(pd.concat(list(whole_data_record.values())))
 
-    for sensor_id, data in whole_data_record.items():
-        ''' Process traning data '''
-        # process training data
-        X_train, y_train = process_train_data(data, scaler, args['input_length'])
+for sensor_id, data in whole_data_record.items():
+    ''' Process traning data '''
+    # process training data
+    X_train, y_train = process_train_data(data, scaler, args['input_length'])
 
-        print(f"{sensor_id} pretraining")
-        init_model = deepcopy(global_model_0)
-        new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
-        new_model.save(f"/content/drive/MyDrive/Hang_PeMS/pretrained_models/{sensor_id}.h5")
+    print(f"{sensor_id} pretraining")
+    init_model = deepcopy(global_model_0)
+    new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
+    new_model.save(f"/content/drive/MyDrive/Hang_PeMS/pretrained_models/{sensor_id}.h5")
 
 print(f"Pretrain till line {min_read_line_num}")
