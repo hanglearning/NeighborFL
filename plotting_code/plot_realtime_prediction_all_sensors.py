@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 # arguments for system vars
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_detector_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-pl', '--plot_last_comm_rounds', type=int, default=24, help='The number of the last comm rounds to plot. Will be a backup if starting_comm_round and ending_comm_round are not specified.')
-parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='round number to start plotting')
+parser.add_argument('-sr', '--starting_comm_round', type=int, default=2, help='round number to start plotting')
 parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='round number to end plotting')
 parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, default to 5 mins')
 parser.add_argument('-sd', '--single_plot_x_axis_density', type=int, default=1, help='label the 1 large plot x-axis by every this number of ticks')
@@ -36,6 +36,8 @@ parser.add_argument('-v', '--version', type=str, default='c', help='c for ccgrid
 parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. By default, it is kind of random')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
+parser.add_argument('-attr', '--attribute', type=str, default='Volume', help='prediciting feature')
+
 
 args = parser.parse_args()
 args = args.__dict__
@@ -96,8 +98,8 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     # draw 1 plot
     # for detector_id in detector_lists:
     fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
-    plt.setp(ax, ylim=(0, 800))
-    fig.text(0.04, 0.5, 'Volume', va='center', rotation='vertical')
+    plt.setp(ax, ylim=(0, 100))
+    fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical')
     ax.set_xlabel('Round Index')
     # detector_id = detector_lists[0]
     detector_id = args['representative']
@@ -125,18 +127,22 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     # xticklabels = list(range(config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds, config_vars["resume_comm_round"], sing_x_density))
     xticklabels = list(range(s_round, e_round + 1, sing_x_density))
     # xticklabels[0] = 1
-    ax.set_xticklabels(xticklabels, Fontsize = 9, rotation = 45)
+    ax.set_xticklabels(xticklabels, fontsize = 9, rotation = 45)
     
-    ax.plot(range(plotting_range), plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range], label='True Data', color='blue')
+    to_plot = plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range]
+    ax.plot(range(len(to_plot)), to_plot, label='True Data', color='blue')
     true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
 
-    ax.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range], label='naive_fl', color='lime')
+    to_plot = plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range]
+    ax.plot(range(len(to_plot)), to_plot, label='naive_fl', color='lime')
 
-    ax.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range], label='stand_alone', color='orange')
+    to_plot = plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range]
+    ax.plot(range(len(to_plot)), to_plot, label='stand_alone', color='orange')
     
-    ax.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range], label='fav_neighbors_fl', color='red')
+    to_plot = plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range]
+    ax.plot(range(len(to_plot)), to_plot, label='fav_neighbors_fl', color='red')
     
-    # ax.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
+    # ax.plot(range(len(to_plot)), plot_data[detector_id]['brute_force']['y'][-plotting_range:], label='brute_force', color='violet')
 
     stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
     naive_fl_curve = mlines.Line2D([], [], color='lime', label="BFRT")
@@ -147,7 +153,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     ax.legend(handles=[true_curve,stand_alone_curve, naive_fl_curve, neighbor_fl_curve], loc='best', prop={'size': 10})
     # ax.legend(handles=[true_curve,brute_force_fl_curve], loc='best', prop={'size': 10})
     fig.set_size_inches(8, 2)
-    plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
+    # plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
     # plt.show()
 
     
@@ -157,12 +163,13 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     #     fig, axs = plt.subplots(ROW, sharex=True, sharey=True)
     # else:
     if ROW == 1 and COL is None:
-        COL = len(detector_lists) - 1
+        # COL = len(detector_lists) - 1
+        COL = len(detector_lists)
     fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
-    plt.setp(axs, ylim=(0, 800))
-    # axs[0].set_ylabel('Volume')
+    plt.setp(axs, ylim=(0, 100))
+    # axs[0].set_ylabel(args['attribute'])
     # fig.text(0.5, 0.04, 'Round Index', ha='center', size=13)
-    fig.text(0.04, 0.5, 'Volume', va='center', rotation='vertical', size=13)
+    fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical', size=13)
     if ROW == 1 and COL == 1:
         axs.set_xlabel('Round Index', size=13)
     elif ROW == 1 and COL > 1:
@@ -176,7 +183,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     my_xticklabels = [s_round, math.ceil((s_round + e_round)/2), e_round]
     
     
-    detector_lists.remove(args['representative'])
+    # detector_lists.remove(args['representative'])
     for detector_plot_iter in range(len(detector_lists)):
         # for 6 plots
         # detector_plot_iter 0 ~ 2 -> row 0, col 0 1 2
@@ -202,16 +209,16 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         subplots.set_xticks(my_xticks)
         subplots.set_xticklabels(my_xticklabels)
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range], label='True Data', color='blue')
+        subplots.plot(range(len(to_plot)), plot_data[detector_id]['true']['y'][start_plot_range:end_plot_range], label='True Data', color='blue')
         true_curve = mlines.Line2D([], [], color='blue', label="TRUE")
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range], label='naive_fl', color='lime')
+        subplots.plot(range(len(to_plot)), plot_data[detector_id]['naive_fl']['y'][start_plot_range:end_plot_range], label='naive_fl', color='lime')
 
-        subplots.plot(range(plotting_range), plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range], label='stand_alone', color='orange')
+        subplots.plot(range(len(to_plot)), plot_data[detector_id]['stand_alone']['y'][start_plot_range:end_plot_range], label='stand_alone', color='orange')
         
-        subplots.plot(range(plotting_range), plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range], label='fav_neighbors_fl', color='red')
+        subplots.plot(range(len(to_plot)), plot_data[detector_id]['fav_neighbors_fl']['y'][start_plot_range:end_plot_range], label='fav_neighbors_fl', color='red')
         
-        # subplots.plot(range(plotting_range), plot_data[detector_id]['brute_force']['y'][start_plot_range:end_plot_range], label='brute_force', color='violet')
+        # subplots.plot(range(len(to_plot)), plot_data[detector_id]['brute_force']['y'][start_plot_range:end_plot_range], label='brute_force', color='violet')
     
         stand_alone_curve = mlines.Line2D([], [], color='orange', label="BASE")
         naive_fl_curve = mlines.Line2D([], [], color='lime', label="BFRT")
@@ -228,7 +235,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
             
         
         
-    fig.set_size_inches(10, 6)
+    fig.set_size_inches(50, 6)
     plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
     # plt.show()
     
