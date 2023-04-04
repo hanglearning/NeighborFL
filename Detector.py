@@ -60,11 +60,12 @@ class Detector:
             self.neighbors = random.shuffle(self.neighbors)
         print(f"Detector {self.id} has detected {len(self.neighbors)} potential neighbors within radius {self.radius} miles.")
             
-    def init_models(self, global_model_0_path):
-        self.stand_alone_model_path = global_model_0_path
-        self.naive_fl_global_model_path = global_model_0_path
-        self.fav_neighbors_fl_agg_model_path = global_model_0_path
-        self.same_dir_fl_global_model_path = global_model_0_path
+    def init_models(self, global_model_0_or_pretrained_model_path):
+        self.stand_alone_model_path = global_model_0_or_pretrained_model_path
+        self.naive_fl_global_model_path = global_model_0_or_pretrained_model_path
+        self.fav_neighbors_fl_agg_model_path = global_model_0_or_pretrained_model_path
+        self.same_dir_fl_global_model_path = global_model_0_or_pretrained_model_path
+
 
     def get_stand_alone_model(self):
         return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)

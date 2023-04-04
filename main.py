@@ -38,6 +38,9 @@ from error_calc import get_MAPE
 import random
 import tensorflow as tf
 
+import shutil
+
+
 # remove some warnings
 import logging
 logging.disable(logging.WARNING)
@@ -47,8 +50,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg_simulation")
 
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/KFRT_data', help='dataset path')
-parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/KFRT_logs", help='base folder path to store running logs and h5 files')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS_csvs', help='dataset path')
+parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_PeMS/KFRT_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 parser.add_argument('-dir', '--direction', type=int, default=1, help='also do fedavg within only N or S')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
@@ -67,6 +70,8 @@ parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for
 parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm comm_round for FL')
 parser.add_argument('-ff', '--num_feedforward', type=int, default=12, help='number of feedforward predictions, used to set up the number of the last layer of the model (usually it has to be equal to -il)')
 parser.add_argument('-tp', '--train_percent', type=float, default=1.0, help='percentage of the data for training')
+parser.add_argument('-pi', '--pretrain_index', type=int, default=0, help='if there are pretrained models, start FL at this data index')
+parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/pretrained_models', help='dataset path')
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
@@ -210,7 +215,13 @@ else:
     global_model_0.save(global_model_0_path)
     # init models
     for sensor_id, detector in list_of_detectors.items():
-        detector.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
+        if config_vars['pretrain_index']:
+            pretrained_models_folder = f'{Detector.logs_dirpath}/pretrained_models'
+            os.makedirs(pretrained_models_folder, exist_ok=True)
+            shutil.copy(f"{config_vars['pretrained_models_path']}/{sensor_id}.h5", pretrained_models_folder)
+            detector.init_models(f"pretrained_models/{sensor_id}.h5")
+        else:
+            detector.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
         
     ''' init prediction records and fav_neighbor records'''
     detector_predicts = {}
@@ -277,7 +288,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
-    if comm_round == 1:
+    if args["pretrain_index"] and comm_round == 1:
+        # load pretrain model
+        training_data_starting_index = args["pretrain_index"]
+        training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
+    elif comm_round == 1:
         training_data_starting_index = 0
         training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
         # if it's comm_round 1 and input_shape 12, need at least 24 training data points because the model at least needs 13 points to train.
