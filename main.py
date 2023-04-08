@@ -86,10 +86,10 @@ parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heurist
 # arguments for fav_neighbor kicking
 parser.add_argument('-kt', '--kick_trigger', type=int, default=2, help='to trigger a kick: 0 - never kick; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -kr')
 parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -kt 1, detector has a probability to kick out worst neighbors to explore new neighbors')
-parser.add_argument('-kr', '--kick_rounds', type=int, default=1, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for -kr number of rounds")
+parser.add_argument('-kr', '--kick_rounds', type=int, default=3, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for -kr number of rounds")
 parser.add_argument('-kn', '--kick_num', type=int, default=1, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
 parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='this number defines how many percent of of neighboring detecotors to kick having the worst reputation.  Default to 0.25.  Either this or -kn has to be specified, if both specified, randomly chosen')
-parser.add_argument('-ks', '--kick_strategy', type=int, default=3, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')
+parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')
 
 # argument for same_dir_fl
 parser.add_argument('-sdfl', '--same_dir_fl', type=int, default=0, help='1 - enable same_dir_fl; 0 - disable')
@@ -381,7 +381,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
                 # give reputation
                 # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
-                # detector.neighbors_to_rep_score[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + error_diff
+                detector.neighbors_to_rep_score[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + error_diff
            
         new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
@@ -503,7 +503,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             rep_tuples = [(id, rep) for id, rep in sorted(detector.neighbors_to_rep_score.items(), key=lambda x: x[1])]
             if config_vars["kick_strategy"] == 1:
                 # kick by lowest reputation
-                pass # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
+                # pass # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
                 for i in range(len(rep_tuples)):
                     if kick_num > 0:
                         to_kick_id = rep_tuples[i][0]
@@ -528,7 +528,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     kicked = detector.fav_neighbors.pop()
                     print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                     del fav_neighbors_fl_agg_models_weights[kicked.id]
-                    # add retry interval experiment shows that later in try phase, the same neighbor may be tried again
+                    # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
                     detector.neighbor_to_last_accumulate[neighbor.id] = comm_round - 1
                     detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
 
