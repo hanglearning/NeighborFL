@@ -381,7 +381,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
                 # give reputation
                 # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
-                detector.neighbors_to_rep_score[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + error_diff
+                detector.neighbors_to_rep_score[neighbor.id] = detector.neighbors_to_rep_score.get(neighbor.id, 0) + error_diff
            
         new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
         detector.update_and_save_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
@@ -528,9 +528,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     kicked = detector.fav_neighbors.pop()
                     print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                     del fav_neighbors_fl_agg_models_weights[kicked.id]
-                    # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
-                    detector.neighbor_to_last_accumulate[neighbor.id] = comm_round - 1
-                    detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
+            # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
+            detector.neighbor_to_last_accumulate[kicked.id] = comm_round - 1
+            detector.neighbor_to_accumulate_interval[kicked.id] = detector.neighbor_to_accumulate_interval.get(kicked.id, 0) + 1
 
 
         ''' if len(fav_neighbors) < k, try new neighbors! '''
@@ -557,6 +557,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 detector.tried_neighbors.append(candidate_fav)
                 print(f"{sensor_id} selects {candidate_fav.id} as a new potential neighbor.")
                 fav_neighbors_fl_agg_models_weights[candidate_fav.id] = candidate_fav.get_fav_neighbors_fl_local_model().get_weights()
+                # update neighbor_to_accumulate_interval
+                if candidate_fav.id in detector.neighbor_to_accumulate_interval and detector.neighbor_to_accumulate_interval[candidate_fav.id] > 0:
+                    detector.neighbor_to_accumulate_interval[candidate_fav.id] -= 1
                 candidate_count -= 1
             candidate_iter += 1
                     
