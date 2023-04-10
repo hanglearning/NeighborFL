@@ -125,11 +125,11 @@ S_dir_fl_global_model_path = 'S_dir_fedavg_global'
 
 # radius FedAvg
 radius_fl_local_model_path = 'radius_fl_local'
-radius_fl_global_model_path = 'radius_fl_agg'
+radius_fl_agg_model_path = 'radius_fl_agg'
 
 # radius FedAvg Same Dir
 radius_same_dir_fl_local_model_path = 'radius_same_dir_fl_local'
-radius_dir_fl_agg_model_path = 'radius_same_dir_fl_agg'
+radius_same_dir_fl_agg_model_path = 'radius_same_dir_fl_agg'
 
 # fav neighbor
 fav_neighbors_fl_local_model_path = 'fav_neighbors_fl_local'
@@ -511,7 +511,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 radius_naive_fl_agg_models_weights[radius_neighbor.id] = radius_neighbor.get_radius_fl_local_model().get_weights()
             radius_naive_fl_agg_model.set_weights(np.mean(list(radius_naive_fl_agg_models_weights.values()), axis=0))
             # save model
-            detector.update_and_save_model(radius_naive_fl_agg_model, comm_round, radius_fl_global_model_path)
+            detector.update_and_save_model(radius_naive_fl_agg_model, comm_round, radius_fl_agg_model_path)
             # do prediction
             print(f"{sensor_id} now predicting by its radius_naive_fl_agg_model.")
             radius_naive_fl_agg_model_predictions = radius_naive_fl_agg_model.predict(detector.get_X_test())
@@ -539,7 +539,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     radius_same_dir_fl_agg_models_weights[radius_neighbor.id] = radius_neighbor.get_radius_fl_local_model().get_weights()
             radius_same_dir_fl_agg_model.set_weights(np.mean(list(radius_same_dir_fl_agg_models_weights.values()), axis=0))
             # save model
-            detector.update_and_save_model(radius_same_dir_fl_agg_model, comm_round, radius_dir_fl_agg_model_path)
+            detector.update_and_save_model(radius_same_dir_fl_agg_model, comm_round, radius_same_dir_fl_agg_model_path)
             # do prediction
             print(f"{sensor_id} now predicting by its radius_same_dir_fl_agg_model.")
             radius_same_dir_fl_agg_model_predictions = radius_same_dir_fl_agg_model.predict(detector.get_X_test())
