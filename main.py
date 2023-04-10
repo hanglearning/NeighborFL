@@ -507,7 +507,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             radius_naive_fl_agg_model = create_model(model_units, model_configs)
             radius_naive_fl_agg_models_weights = {}
             radius_naive_fl_agg_models_weights[detector.id] = detector.get_radius_fl_local_model().get_weights()
-            for radius_neighbor in detector.neighbors:
+            for radius_neighbor, _ in detector.neighbors:
                 radius_naive_fl_agg_models_weights[radius_neighbor.id] = radius_neighbor.get_radius_fl_local_model().get_weights()
             radius_naive_fl_agg_model.set_weights(np.mean(list(radius_naive_fl_agg_models_weights.values()), axis=0))
             # save model
@@ -534,7 +534,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             radius_same_dir_fl_agg_models_weights = {}
             radius_same_dir_fl_agg_models_weights[detector.id] = detector.get_radius_fl_local_model().get_weights()
             this_sensor_direction = sensor_id.split('_')[1]
-            for radius_neighbor in detector.neighbors:
+            for radius_neighbor, _ in detector.neighbors:
                 if radius_neighbor.id.split('_')[1] == this_sensor_direction:
                     radius_same_dir_fl_agg_models_weights[radius_neighbor.id] = radius_neighbor.get_radius_fl_local_model().get_weights()
             radius_same_dir_fl_agg_model.set_weights(np.mean(list(radius_same_dir_fl_agg_models_weights.values()), axis=0))
@@ -601,6 +601,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                                 detector.fav_neighbors.remove(list_of_detectors[to_kick_id])
                                 print(f"{sensor_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                                 kick_num -= 1
+                                # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
+                                detector.neighbor_to_last_accumulate[to_kick_id] = comm_round - 1
+                                detector.neighbor_to_accumulate_interval[to_kick_id] = detector.neighbor_to_accumulate_interval.get(to_kick_id, 0) + 1
                         else:
                             break
                 elif config_vars["kick_strategy"] == 2:
@@ -610,6 +613,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                             kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
                             print(f"{sensor_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                             kick_num -= 1
+                            detector.neighbor_to_last_accumulate[kicked_neighbor.id] = comm_round - 1
+                            detector.neighbor_to_accumulate_interval[kicked_neighbor.id] = detector.neighbor_to_accumulate_interval.get(kicked_neighbor.id, 0) + 1
                         else:
                             break
                 elif config_vars["kick_strategy"] == 3:
@@ -618,9 +623,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         kicked = detector.fav_neighbors.pop()
                         print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                         del fav_neighbors_fl_agg_models_weights[kicked.id]
-                # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
-                detector.neighbor_to_last_accumulate[kicked.id] = comm_round - 1
-                detector.neighbor_to_accumulate_interval[kicked.id] = detector.neighbor_to_accumulate_interval.get(kicked.id, 0) + 1
+                        detector.neighbor_to_last_accumulate[kicked.id] = comm_round - 1
+                        detector.neighbor_to_accumulate_interval[kicked.id] = detector.neighbor_to_accumulate_interval.get(kicked.id, 0) + 1
+                
 
 
             ''' if len(fav_neighbors) < k, try new neighbors! '''
