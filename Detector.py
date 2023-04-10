@@ -195,10 +195,10 @@ class Detector:
             self.radius_fl_agg_model_path = new_model_path
 
         # same dir pure FedAvg
-        elif model_folder_name == 'same_radius_dir_fl_local': 
+        elif model_folder_name == 'radius_same_dir_fl_local': 
             self.radius_same_dir_fl_local_model_path = new_model_path
 
-        elif model_folder_name == 'same_radius_dir_fl_agg': 
+        elif model_folder_name == 'radius_same_dir_fl_agg': 
             self.radius_same_dir_fl_local_model_path = new_model_path
 
         # fav_neighbors
