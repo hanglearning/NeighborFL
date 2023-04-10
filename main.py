@@ -377,7 +377,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # radius same dir fedavg local model
         if int(str(args["learning_methods"])[4]):
             print(f"{sensor_id} training radius_same_dir_fl local model.. (5/{len(str(args['learning_methods']))})")
-            new_model = train_model(detector.get_last_radius_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
+            new_model = train_model(detector.get_last_radius_same_dir_fl_agg_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, radius_same_dir_fl_local_model_path)
         
         if int(str(args["learning_methods"])[5]):

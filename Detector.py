@@ -127,7 +127,7 @@ class Detector:
     def get_radius_same_dir_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_local_model_path}', compile = False)
     
-    def get_last_radius_same_dir_fl_global_model(self):
+    def get_last_radius_same_dir_fl_agg_model(self):
         return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_agg_model_path}', compile = False)
     
     # fav_neighbors
@@ -199,7 +199,7 @@ class Detector:
             self.radius_same_dir_fl_local_model_path = new_model_path
 
         elif model_folder_name == 'radius_same_dir_fl_agg': 
-            self.radius_same_dir_fl_local_model_path = new_model_path
+            self.radius_same_dir_fl_agg_model_path = new_model_path
 
         # fav_neighbors
         elif model_folder_name == 'fav_neighbors_fl_local': 
