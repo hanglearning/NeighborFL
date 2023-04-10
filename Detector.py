@@ -18,13 +18,30 @@ class Detector:
         self.radius = radius # treat detectors within this radius as neighbors, unit miles. Default to None - consider every participating detector
         # 3 models to report and compare
         self.k = k # set maximum number of possible fav_neighbors. Can be used with radius
+
+        # baseline
         self.stand_alone_model_path = None
+
+        # pure FedAvg
         self.naive_fl_local_model_path = None # CCGrid
         self.naive_fl_global_model_path = None # CCGrid
-        self.fav_neighbors_fl_local_model_path = None
-        self.fav_neighbors_fl_agg_model_path = None # aggregated
+
+        # same dir pure FedAvg
         self.same_dir_fl_local_model_path = None
         self.same_dir_fl_global_model_path = None
+
+        # radius pure FedAvg
+        self.radius_fl_local_model_path = None 
+        self.radius_fl_global_model_path = None 
+
+        # radius same dir pure FedAvg
+        self.radius_same_dir_fl_local_model_path = None
+        self.radius_same_dir_fl_global_model_path = None
+
+        # fav_neighbor
+        self.fav_neighbors_fl_local_model_path = None
+        self.fav_neighbors_fl_agg_model_path = None # aggregated
+
 
         self.fav_neighbors_fl_predictions = None
         self.tried_fav_neighbors_fl_agg_model_path = None # aggregated
@@ -61,27 +78,59 @@ class Detector:
         print(f"Detector {self.id} has detected {len(self.neighbors)} potential neighbors within radius {self.radius} miles.")
             
     def init_models(self, global_model_0_or_pretrained_model_path):
+
+        # baseline
         self.stand_alone_model_path = global_model_0_or_pretrained_model_path
+
+        # pure FedAvg
         self.naive_fl_global_model_path = global_model_0_or_pretrained_model_path
-        self.fav_neighbors_fl_agg_model_path = global_model_0_or_pretrained_model_path
+
+        # same dir pure FedAvg
         self.same_dir_fl_global_model_path = global_model_0_or_pretrained_model_path
 
+        # radius pure FedAvg
+        self.radius_fl_global_model_path = global_model_0_or_pretrained_model_path
 
+        # radius same dir pure FedAvg  
+        self.radius_same_dir_fl_local_model_path = global_model_0_or_pretrained_model_path
+
+        # fav_neighbors
+        self.fav_neighbors_fl_agg_model_path = global_model_0_or_pretrained_model_path
+        
+
+    # standalone
     def get_stand_alone_model(self):
         return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)
     
+    # pure FedAvg
     def get_naive_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.naive_fl_local_model_path}', compile = False)
     
     def get_last_naive_fl_global_model(self):
         return load_model(f'{self.logs_dirpath}/{self.naive_fl_global_model_path}', compile = False)
 
+    # same dir pure FedAvg
     def get_same_dir_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.same_dir_fl_local_model_path}', compile = False)
     
     def get_last_same_dir_fl_global_model(self):
         return load_model(f'{self.logs_dirpath}/{self.same_dir_fl_global_model_path}', compile = False)
     
+    # radius pure FedAvg
+    def get_radius_fl_local_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.radius_fl_local_model_path}', compile = False)
+    
+    def get_last_radius_fl_global_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.radius_fl_global_model_path}', compile = False)
+
+    # same dir pure FedAvg
+    def get_radius_same_dir_fl_local_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_local_model_path}', compile = False)
+    
+    def get_last_radius_same_dir_fl_global_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_global_model_path}', compile = False)
+    
+    # fav_neighbors
     def get_fav_neighbors_fl_local_model(self):
         return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}', compile = False)
     
@@ -93,12 +142,14 @@ class Detector:
         if not os.path.isfile(model_path):
             return None
         return load_model(model_path, compile = False)
-        
+    
+    # pure FedAvg
     @classmethod
     def save_fl_global_model(cls, new_model, comm_round, naive_fl_global_model_path):
         new_model.save(f'{cls.logs_dirpath}/{naive_fl_global_model_path}/comm_{comm_round}.h5')
         cls.delete_historical_models(f'{cls.logs_dirpath}/{naive_fl_global_model_path}', comm_round)
 
+    # same dir pure FedAvg
     @classmethod
     def save_N_global_model(cls, new_model, comm_round, N_dir_fl_global_model_path):
         new_model.save(f'{cls.logs_dirpath}/{N_dir_fl_global_model_path}/comm_{comm_round}.h5')
@@ -109,22 +160,48 @@ class Detector:
         new_model.save(f'{cls.logs_dirpath}/{S_dir_fl_global_model_path}/comm_{comm_round}.h5')
         cls.delete_historical_models(f'{cls.logs_dirpath}/{S_dir_fl_global_model_path}', comm_round)
     
+    
+    # pure FedAvg
     def update_fl_global_model(self, comm_round, naive_fl_global_model_path):
         self.naive_fl_global_model_path = f'{naive_fl_global_model_path}/comm_{comm_round}.h5'
 
+    # same dir pure FedAvg
     def update_same_dir_fl_global_model(self, comm_round, same_dir_fl_global_model_path):
         self.same_dir_fl_global_model_path = f'{same_dir_fl_global_model_path}/comm_{comm_round}.h5'
+
+    
         
     def update_and_save_model(self, new_model, comm_round, model_folder_name):
         os.makedirs(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', exist_ok=True)
         new_model_path = f'{model_folder_name}/{self.id}/comm_{comm_round}.h5'
         new_model.save(f'{self.logs_dirpath}/{new_model_path}')
+        # baseline
         if model_folder_name == 'stand_alone': 
             self.stand_alone_model_path = new_model_path
+
+        # pure FedAvg
         elif model_folder_name == 'naive_fl_local': 
             self.naive_fl_local_model_path = new_model_path
+
+        # same dir pure FedAvg
         elif model_folder_name == 'same_dir_fl_local': 
             self.same_dir_fl_local_model_path = new_model_path
+        
+        # pure radius FedAvg
+        elif model_folder_name == 'radius_fl_local': 
+            self.radius_fl_local_model_path = new_model_path
+
+        elif model_folder_name == 'radius_fl_agg': 
+            self.radius_fl_local_model_path = new_model_path
+
+        # same dir pure FedAvg
+        elif model_folder_name == 'same_radius_dir_fl_local': 
+            self.radius_same_dir_fl_local_model_path = new_model_path
+
+        elif model_folder_name == 'same_radius_dir_fl_agg': 
+            self.radius_same_dir_fl_local_model_path = new_model_path
+
+        # fav_neighbors
         elif model_folder_name == 'fav_neighbors_fl_local': 
             self.fav_neighbors_fl_local_model_path = new_model_path
         elif model_folder_name == 'fav_neighbors_fl_agg': 
