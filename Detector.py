@@ -36,7 +36,7 @@ class Detector:
 
         # radius same dir pure FedAvg
         self.radius_same_dir_fl_local_model_path = None
-        self.radius_same_dir_fl_global_model_path = None
+        self.radius_same_dir_fl_agg_model_path = None
 
         # fav_neighbor
         self.fav_neighbors_fl_local_model_path = None
@@ -92,7 +92,7 @@ class Detector:
         self.radius_fl_global_model_path = global_model_0_or_pretrained_model_path
 
         # radius same dir pure FedAvg  
-        self.radius_same_dir_fl_local_model_path = global_model_0_or_pretrained_model_path
+        self.radius_same_dir_fl_agg_model_path = global_model_0_or_pretrained_model_path
 
         # fav_neighbors
         self.fav_neighbors_fl_agg_model_path = global_model_0_or_pretrained_model_path
@@ -128,7 +128,7 @@ class Detector:
         return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_local_model_path}', compile = False)
     
     def get_last_radius_same_dir_fl_global_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_global_model_path}', compile = False)
+        return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_agg_model_path}', compile = False)
     
     # fav_neighbors
     def get_fav_neighbors_fl_local_model(self):
