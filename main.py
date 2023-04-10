@@ -525,7 +525,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # create radius_same_dir_fl model from same_dir_fl_local models within radius
         detecotr_iter = 1
         for sensor_id, detector in list_of_detectors.items():
-            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_same_dir_fl (4/{len(str(args['learning_methods']))})"
+            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_same_dir_fl (5/{len(str(args['learning_methods']))})"
             print('-' * len(print_text))
             print(print_text)
             
