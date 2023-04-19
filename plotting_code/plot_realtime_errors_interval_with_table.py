@@ -184,7 +184,7 @@ def compare_l1_smallest_equal_percent(l1, l2, l3):
     percent_string = f"{percentage:.2%}"
     return percentage, percent_string
 
-def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, error_to_plot, COL):
+def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_compare_model, COL):
 
     sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
     
@@ -217,10 +217,11 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
     # axs[COL//2].set_xlabel(f'Round Range', size=13)
 
     # count red labels
-    naive = 0
-    standalone = 0
-    same_dir = 0
-    same_vs_naive = 0
+    # naive = 0
+    # standalone = 0
+    # same_dir = 0
+    # same_vs_naive = 0
+    model_to_red_label_counts = []
     
     for sensor_plot_iter in range(len(sensor_lists)):
       
@@ -247,13 +248,14 @@ def plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors
         subplots.set_xticklabels([f'  2-\n{(num_of_plot_points // 2 - 1) * e_interval}', f'{(num_of_plot_points // 2 - 1) * e_interval + 1}-\n{(num_of_plot_points - 1) * e_interval}', f'{(num_of_plot_points - 1) * e_interval + 1}-\n{end_round}'], fontsize=8)
         
         
-        # all real
-        # global_better_percent_val, global_better_percent_string = compare_l1_smaller_equal_percent(all_prediction_errors[sensor_id]['naive_fl'][error_to_plot], all_prediction_errors[sensor_id]['stand_alone'][error_to_plot])
-        
-        subplots.plot(range(0, num_of_plot_points), model_error_normalized['stand_alone'][error_to_plot], label='stand_alone', color='#ffb839')
+        # start plotting with annotation
+        for model_err in model_error_normalized:
+            subplots.plot(range(0, num_of_plot_points), model_error_normalized[model_err][error_to_plot], label=model_err, color='#ffb839')
 
         
         # compare naive_fl vs. fav_neighbors_fl and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put what we expect to surpass as the first argument.
+
+
         fav_better_percent_val_fav_vs_naive, fav_better_percent_string_fav_vs_naive = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['naive_fl'][error_to_plot])
         # same for standalone vs. fav_neighbors_fl
         fav_better_percent_val_fav_vs_standalone, fav_better_percent_string_fav_vs_standalone = compare_l1_smaller_equal_percent(model_error_normalized['fav_neighbors_fl'][error_to_plot], model_error_normalized['stand_alone'][error_to_plot])
@@ -376,9 +378,10 @@ if False:
 all_prediction_errors = calculate_errors(detector_predicts) # calculate global model outperform percentage
 
 # err_type_to_y_top = {"MAE": }
+to_compare_model = 'fav_neighbors_fl'
 for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
     print(f"Plotting {err_type}...")
-    red_label_counts = plot_realtime_errors_all_sensors(realtime_error_table, all_prediction_errors, err_type, COL)
+    red_label_counts = plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL)
     print(red_label_counts)
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
 # for error_type in error_ylim.keys():
