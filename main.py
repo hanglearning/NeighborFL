@@ -287,7 +287,7 @@ INPUT_LENGTH = config_vars['input_length']
 new_sample_size_per_comm_round = INPUT_LENGTH
 
 # determine maximum comm rounds by the minimum number of data sample a device owned and the input_length
-max_comm_rounds = individual_min_data_sample // INPUT_LENGTH - 2
+max_comm_rounds = (individual_min_data_sample - config_vars['pretrain_index']) // INPUT_LENGTH - 2
 # comm_rounds overwritten while resuming
 if args['comm_rounds']:
     config_vars['comm_rounds'] = args['comm_rounds']
@@ -309,20 +309,16 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
-    if args["pretrain_index"] and comm_round == 1:
-        # load pretrain model
-        training_data_starting_index = args["pretrain_index"]
-        training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
-    elif comm_round == 1:
-        training_data_starting_index = 0
+    if comm_round == 1:
+        training_data_starting_index = config_vars["pretrain_index"]
         training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
         # if it's comm_round 1 and input_shape 12, need at least 24 training data points because the model at least needs 13 points to train.
         # Therefore,
         # comm_round 1 -> 1~24 training points, predict with test 13~35 test points, 
         # 1- 24， 2 - 36， 3 - 48， 4 - 60
     else:
-        training_data_ending_index = (comm_round + 1) * new_sample_size_per_comm_round - 1
-        training_data_starting_index = training_data_ending_index - config_vars['max_data_size']
+        training_data_ending_index = config_vars["pretrain_index"] + (comm_round + 1) * new_sample_size_per_comm_round - 1
+        training_data_starting_index = training_data_ending_index - config_vars['max_data_size'] + 1
         if training_data_starting_index < 1:
             training_data_starting_index = 0
     # test data
@@ -355,36 +351,36 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         ''' Training '''
         print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now training on row {training_data_starting_index} to {training_data_ending_index}...")
         # stand_alone model
-        if int(str(args["learning_methods"])[0]):
-            print(f"{sensor_id} training stand_alone model.. (1/{len(str(args['learning_methods']))})")
+        if int(str(config_vars["learning_methods"])[0]):
+            print(f"{sensor_id} training stand_alone model.. (1/{len(str(config_vars['learning_methods']))})")
             new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, stand_alone_model_path)
         # naive_fl local model
-        if int(str(args["learning_methods"])[1]):
-            print(f"{sensor_id} training naive_fl local model.. (2/{len(str(args['learning_methods']))})")
+        if int(str(config_vars["learning_methods"])[1]):
+            print(f"{sensor_id} training naive_fl local model.. (2/{len(str(config_vars['learning_methods']))})")
             new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
         # same dir fedavg local model
-        if int(str(args["learning_methods"])[2]):
-            print(f"{sensor_id} training same_dir_fl local model.. (3/{len(str(args['learning_methods']))})")
+        if int(str(config_vars["learning_methods"])[2]):
+            print(f"{sensor_id} training same_dir_fl local model.. (3/{len(str(config_vars['learning_methods']))})")
             new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
         # radius naive_fl local model
-        if int(str(args["learning_methods"])[3]):
-            print(f"{sensor_id} training radius_naive_fl local model.. (4/{len(str(args['learning_methods']))})")
+        if int(str(config_vars["learning_methods"])[3]):
+            print(f"{sensor_id} training radius_naive_fl local model.. (4/{len(str(config_vars['learning_methods']))})")
             new_model = train_model(detector.get_last_radius_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, radius_fl_local_model_path)
         # radius same dir fedavg local model
-        if int(str(args["learning_methods"])[4]):
-            print(f"{sensor_id} training radius_same_dir_fl local model.. (5/{len(str(args['learning_methods']))})")
+        if int(str(config_vars["learning_methods"])[4]):
+            print(f"{sensor_id} training radius_same_dir_fl local model.. (5/{len(str(config_vars['learning_methods']))})")
             new_model = train_model(detector.get_last_radius_same_dir_fl_agg_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, radius_same_dir_fl_local_model_path)
         
-        if int(str(args["learning_methods"])[5]):
+        if int(str(config_vars["learning_methods"])[5]):
             ''' fav_neighbors_fl (core algorithm)'''
             # fav_neighbors_fl local model
             detector.has_added_neigbor = False
-            print(f"{sensor_id} training fav_neighbors_fl local model.. (6/{len(str(args['learning_methods']))})")
+            print(f"{sensor_id} training fav_neighbors_fl local model.. (6/{len(str(config_vars['learning_methods']))})")
             chosen_model = detector.get_last_fav_neighbors_fl_agg_model() # by default
             if comm_round > 1:
                 error_without_new_neighbors = get_error(y_true, detector.fav_neighbors_fl_predictions)  # also works when no new neighbors were tried in last round
@@ -425,16 +421,16 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             detector_fav_neighbors[sensor_id].append(current_fav_neighbors)
             print(f"{sensor_id}'s current fav neighbors are {current_fav_neighbors}.")
         
-        if int(str(args["learning_methods"])[0]):
+        if int(str(config_vars["learning_methods"])[0]):
             ''' stand_alone model predictions '''
-            print(f"{sensor_id} is now predicting by its stand_alone model... (1/{len(str(args['learning_methods']))})")
+            print(f"{sensor_id} is now predicting by its stand_alone model... (1/{len(str(config_vars['learning_methods']))})")
             stand_alone_predictions = detector.get_stand_alone_model().predict(X_test)
             stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
             detector_predicts[sensor_id]['stand_alone'].append((comm_round + 1,stand_alone_predictions))
 
         detecotr_iter += 1
     
-    if int(str(args["learning_methods"])[1]):
+    if int(str(config_vars["learning_methods"])[1]):
         ''' Simulate Vanilla CCGrid FedAvg '''
         # create naive_fl model from all naive_fl_local models
         new_naive_fl_global_model = create_model(model_units, model_configs)
@@ -450,7 +446,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             # update new_naive_fl_global_model
             detector.update_fl_global_model(comm_round, naive_fl_global_model_path)
             # do prediction
-            print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model (2/{len(str(args['learning_methods']))})")
+            print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by new_naive_fl_global_model (2/{len(str(config_vars['learning_methods']))})")
             new_naive_fl_global_model_predictions = new_naive_fl_global_model.predict(detector.get_X_test())
             new_naive_fl_global_model_predictions = scaler.inverse_transform(new_naive_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
             detector
@@ -458,7 +454,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             detecotr_iter += 1
 
     ''' Simulate Same Dir FedAvg '''
-    if int(str(args["learning_methods"])[2]):
+    if int(str(config_vars["learning_methods"])[2]):
         # create naive_fl model from all naive_fl_local models
         print("Predicting on Same Dir FedAvg model")
         N_dir_fedavg_global_model = create_model(model_units, model_configs)
@@ -488,18 +484,18 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             # update new_same_dir_fl_global_model
             detector.update_same_dir_fl_global_model(comm_round, same_dir_fl_global_model_path)
             # do prediction
-            print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model (3/{len(str(args['learning_methods']))})")
+            print(f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) now predicting by same_dir_fl_global_model (3/{len(str(config_vars['learning_methods']))})")
             new_same_dir_fl_global_model_predictions = new_same_dir_fl_global_model.predict(detector.get_X_test())
             new_same_dir_fl_global_model_predictions = scaler.inverse_transform(new_same_dir_fl_global_model_predictions.reshape(-1, 1)).reshape(1, -1)[0]
             detector
             detector_predicts[sensor_id]['same_dir_fl'].append((comm_round + 1,new_same_dir_fl_global_model_predictions))
             detecotr_iter += 1
 
-    if int(str(args["learning_methods"])[3]):
+    if int(str(config_vars["learning_methods"])[3]):
         ''' Simulate Pure Radius FedAvg '''
         detecotr_iter = 1
         for sensor_id, detector in list_of_detectors.items():
-            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_naive_fl (4/{len(str(args['learning_methods']))})"
+            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_naive_fl (4/{len(str(config_vars['learning_methods']))})"
             print('-' * len(print_text))
             print(print_text)
             
@@ -520,12 +516,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             #detector.radius_naive_fl_predictions = radius_naive_fl_agg_model_predictions
             detecotr_iter += 1
 
-    if int(str(args["learning_methods"])[4]):
+    if int(str(config_vars["learning_methods"])[4]):
         ''' Simulate Radius Same Dir FedAvg '''
         # create radius_same_dir_fl model from same_dir_fl_local models within radius
         detecotr_iter = 1
         for sensor_id, detector in list_of_detectors.items():
-            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_same_dir_fl (5/{len(str(args['learning_methods']))})"
+            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating radius_same_dir_fl (5/{len(str(config_vars['learning_methods']))})"
             print('-' * len(print_text))
             print(print_text)
             
@@ -548,12 +544,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             detecotr_iter += 1
 
     
-    if int(str(args["learning_methods"])[5]):
+    if int(str(config_vars["learning_methods"])[5]):
         ''' Simulate fav_neighbor FL FedAvg '''    
         # determine if add new neighbor or not (core algorithm)
         detecotr_iter = 1
         for sensor_id, detector in list_of_detectors.items():
-            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL (6/{len(str(args['learning_methods']))})"
+            print_text = f"{sensor_id} ({detecotr_iter}/{len(list_of_detectors.keys())}) simulating fav_neighbor FL (6/{len(str(config_vars['learning_methods']))})"
             print('-' * len(print_text))
             print(print_text)
             
