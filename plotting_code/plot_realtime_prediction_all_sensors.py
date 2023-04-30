@@ -46,6 +46,7 @@ args = args.__dict__
 logs_dirpath = args["logs_dirpath"]
 with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
 		config_vars = pickle.load(f)
+                
 input_length = config_vars["input_length"]
 plot_last_comm_rounds = args["plot_last_comm_rounds"] # to plot last plot_last_comm_rounds hours
 time_res = args["time_resolution"]
@@ -238,6 +239,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     fig.set_size_inches(50, 6)
     plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
     # plt.show()
+
     
 def calculate_errors(plot_data):
     error_values = {}
@@ -262,6 +264,7 @@ def calculate_errors(plot_data):
     
 with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
+
 detector_lists, plot_data = make_plot_data(detector_predicts)
 # plot_and_save(detector_lists, plot_data)
 plot_and_save_two_rows(detector_lists, plot_data)

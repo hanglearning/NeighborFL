@@ -25,7 +25,9 @@ from tabulate import tabulate
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="inferencing code")
 
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
-parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table')
+parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='if this presents, overwrites the fav_neighbor_fl in -lp')
+parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
+parser.add_argument('-si', '--saturation_interval', type=int, default=10, help='used in saturation analysis')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-er', '--end_round', type=int, default=None, help='provide the ending communication round, by default the last round of the simulation')
@@ -34,7 +36,7 @@ args = parser.parse_args()
 args = args.__dict__
 
 '''
-Note that if there was X rounds in FL, the real time predictions were (X-1) rounds rather than X rounds. The first round's prediction will predict for 2nd round, and so.
+Note that if there was X rounds in FL, the real time predictions were (X-1) rounds rather than X rounds. The first round's prediction will predict for 2nd round, and so. That's why it will plot (-ei - 1) rounds
 '''
 
 ''' load vars '''
@@ -44,6 +46,14 @@ with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
 # all_detector_files = config_vars["all_detector_files"]
 with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
+
+try:
+    with open(f"{args['logs_dirpath2']}/check_point/all_detector_predicts.pkl", 'rb') as f:
+        fav_predicts = pickle.load(f)
+        for detector in detector_predicts:
+           detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
+except:
+    pass
 
 all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
     
@@ -286,7 +296,42 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
     # print the comparison stat
     for model_name in model_to_red_label_counts:
        print(f"fav_beats_{model_name}: {model_to_red_label_counts[model_name]}")
+
+def saturation_analysis(realtime_error_table, err_type, to_compare_model):
+
+    sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
+
+    si = args["saturation_interval"]
+    model_to_beats = {key: [] for key in realtime_error_table[list(realtime_error_table.keys())[0]].keys()}
+
+    for ind_iter in range(args["end_round"] // si):
     
+        model_to_beat_counts = {key: 0 for key in realtime_error_table[list(realtime_error_table.keys())[0]].keys()}
+        
+        for sensor_plot_iter in range(len(sensor_lists)):
+            
+            sensor_id = sensor_lists[sensor_plot_iter]
+            model_err_normalized = realtime_error_table[sensor_id]
+            
+            # start plotting with annotation
+            model_iter = 0
+            for model_name in model_err_normalized:
+                if model_name == to_compare_model:
+                    continue
+                
+                fav_better_percent_val, fav_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model][err_type][ind_iter * si: ind_iter * si + si], model_err_normalized[model_name][err_type][ind_iter * si: ind_iter * si + si])
+                
+                if fav_better_percent_val >= 0.5:
+                    model_to_beat_counts[model_name] += 1
+                
+        for model_name, value in model_to_beat_counts.items():
+            model_to_beats[model_name].append(value)
+
+    # for model_name, beats in model_to_beats.items():
+    #    plt.plot(range(len(beats)), beats, model_name)
+    # plt.savefig(f'{plot_dir_path}/saturation_analysis.png', bbox_inches='tight', dpi=300)
+    return model_to_beats
+
     
 realtime_error_table = construct_realtime_error_table(detector_predicts)
 
@@ -314,6 +359,7 @@ to_compare_model = 'fav_neighbors_fl'
 for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
     print(f"Plotting {err_type}...")
     plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL)
+    saturation_analysis(realtime_error_table, err_type, to_compare_model)
     
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
 # for error_type in error_ylim.keys():
