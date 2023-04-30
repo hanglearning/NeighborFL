@@ -70,8 +70,9 @@ parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for
 parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm comm_round for FL')
 parser.add_argument('-ff', '--num_feedforward', type=int, default=12, help='number of feedforward predictions, used to set up the number of the last layer of the model (usually it has to be equal to -il)')
 parser.add_argument('-tp', '--train_percent', type=float, default=1.0, help='percentage of the data for training')
-parser.add_argument('-pi', '--pretrain_index', type=int, default=0, help='if there are pretrained models, start FL at this data index')
-parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/pretrained_models', help='dataset path')
+parser.add_argument('-si', '--start_train_index', type=int, default=0, help='start FL at this data index, usually for pretrained models')
+parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, help='pretrained models path. If not provided, the program will train from scratch')
+# parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/pretrained_models')
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
@@ -232,7 +233,7 @@ else:
     global_model_0.save(global_model_0_path)
     # init models
     for sensor_id, detector in list_of_detectors.items():
-        if config_vars['pretrain_index']:
+        if config_vars['pretrained_models_path']:
             pretrained_models_folder = f'{Detector.logs_dirpath}/pretrained_models'
             os.makedirs(pretrained_models_folder, exist_ok=True)
             shutil.copy(f"{config_vars['pretrained_models_path']}/{sensor_id}.h5", pretrained_models_folder)
@@ -287,7 +288,7 @@ INPUT_LENGTH = config_vars['input_length']
 new_sample_size_per_comm_round = INPUT_LENGTH
 
 # determine maximum comm rounds by the minimum number of data sample a device owned and the input_length
-max_comm_rounds = (individual_min_data_sample - config_vars['pretrain_index']) // INPUT_LENGTH - 2
+max_comm_rounds = (individual_min_data_sample - config_vars['start_train_index']) // INPUT_LENGTH - 2
 # comm_rounds overwritten while resuming
 if args['comm_rounds']:
     config_vars['comm_rounds'] = args['comm_rounds']
@@ -310,14 +311,14 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     ''' calculate simulation data range '''
     # train data
     if comm_round == 1:
-        training_data_starting_index = config_vars["pretrain_index"]
+        training_data_starting_index = config_vars["start_train_index"]
         training_data_ending_index = training_data_starting_index + new_sample_size_per_comm_round * 2 - 1
         # if it's comm_round 1 and input_shape 12, need at least 24 training data points because the model at least needs 13 points to train.
         # Therefore,
         # comm_round 1 -> 1~24 training points, predict with test 13~35 test points, 
         # 1- 24， 2 - 36， 3 - 48， 4 - 60
     else:
-        training_data_ending_index = config_vars["pretrain_index"] + (comm_round + 1) * new_sample_size_per_comm_round - 1
+        training_data_ending_index = config_vars["start_train_index"] + (comm_round + 1) * new_sample_size_per_comm_round - 1
         training_data_starting_index = training_data_ending_index - config_vars['max_data_size'] + 1
         if training_data_starting_index < 1:
             training_data_starting_index = 0
