@@ -208,7 +208,7 @@ else:
         print(f'Loaded {read_to_line} lines of data from {detector_file_name} (percentage: {config_vars["train_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
         whole_data_record[sensor_id] = whole_data
         # create a detector object
-        detector = Detector(sensor_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['latitude']), longitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['longitude']),direction=sensor_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
+        detector = Detector(sensor_id, radius=config_vars['radius'], k=config_vars['k'],latitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['Latitude']), longitude=float(detector_locations[detector_locations.sensor_id==int(sensor_id.split('_')[0])]['Longitude']),direction=sensor_id.split('_')[1], num_neighbors_try=config_vars['num_neighbors_try'], add_heuristic=config_vars['add_heuristic'])
         list_of_detectors[sensor_id] = detector
     config_vars["individual_min_data_sample"] = individual_min_data_sample
     
