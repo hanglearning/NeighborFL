@@ -409,7 +409,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     else:
                         # tried neighbors are bad
                         print(f"{detector.id} SKIPPED adding {neighbor.id} to its fav neighbors.")
-                        detector.neighbor_to_last_accumulate[neighbor.id] = comm_round - 1
+                        detector.neighbor_to_last_accumulate[neighbor.id] = comm_round
                         detector.neighbor_to_accumulate_interval[neighbor.id] = detector.neighbor_to_accumulate_interval.get(neighbor.id, 0) + 1
                     # give reputation
                     # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
@@ -599,7 +599,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                                 print(f"{sensor_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                                 kick_num -= 1
                                 # add retry interval since experiment shows that later in try phase, the same neighbor may be tried again
-                                detector.neighbor_to_last_accumulate[to_kick_id] = comm_round - 1
+                                detector.neighbor_to_last_accumulate[to_kick_id] = comm_round
                                 detector.neighbor_to_accumulate_interval[to_kick_id] = detector.neighbor_to_accumulate_interval.get(to_kick_id, 0) + 1
                         else:
                             break
@@ -610,7 +610,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                             kicked_neighbor = detector.fav_neighbors.pop(random.randrange(len(detector.fav_neighbors)))
                             print(f"{sensor_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                             kick_num -= 1
-                            detector.neighbor_to_last_accumulate[kicked_neighbor.id] = comm_round - 1
+                            detector.neighbor_to_last_accumulate[kicked_neighbor.id] = comm_round
                             detector.neighbor_to_accumulate_interval[kicked_neighbor.id] = detector.neighbor_to_accumulate_interval.get(kicked_neighbor.id, 0) + 1
                         else:
                             break
@@ -620,7 +620,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                         kicked = detector.fav_neighbors.pop()
                         print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in detector.fav_neighbors)}.")
                         del fav_neighbors_fl_agg_models_weights[kicked.id]
-                        detector.neighbor_to_last_accumulate[kicked.id] = comm_round - 1
+                        detector.neighbor_to_last_accumulate[kicked.id] = comm_round
                         detector.neighbor_to_accumulate_interval[kicked.id] = detector.neighbor_to_accumulate_interval.get(kicked.id, 0) + 1
                 
 

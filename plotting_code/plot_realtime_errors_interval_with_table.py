@@ -53,7 +53,7 @@ try:
         for detector in detector_predicts:
            detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
 except:
-    pass
+    print("-lp2 not provided or not valid")
 
 all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
     
@@ -359,7 +359,7 @@ to_compare_model = 'fav_neighbors_fl'
 for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
     print(f"Plotting {err_type}...")
     plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL)
-    saturation_analysis(realtime_error_table, err_type, to_compare_model)
+    # saturation_analysis(realtime_error_table, err_type, to_compare_model)
     
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
 # for error_type in error_ylim.keys():

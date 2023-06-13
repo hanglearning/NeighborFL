@@ -33,17 +33,18 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # arguments for system vars
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="KFRT pretrain")
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/KFRT_data', help='dataset path')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
 parser.add_argument('-il', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
 parser.add_argument('-hn', '--hidden_neurons', type=int, default=128, help='number of neurons in one of each 2 layers')
 parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss evaluation while training')
 parser.add_argument('-op', '--optimizer', type=str, default="rmsprop", help='optimizer for training')
-parser.add_argument('-me', '--metrics', type=str, default="mape", help='evaluation metrics for training')
+parser.add_argument('-me', '--metrics', type=str, default="mse", help='evaluation metrics to view for training')
 parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for training')
-parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm comm_round for FL')
-parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.5, help='percentage of the data for pretraining')
+parser.add_argument('-e', '--epochs', type=int, default=5, help='pretrain epoch number')
+parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.0, help='percentage of the data for pretraining')
+parser.add_argument('-pi', '--pretrain_index', type=int, default=0, help='till which row in df we do pretrain.if this is provide, overwrite -pp')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -68,6 +69,8 @@ for detector_file_iter in range(len(all_detector_files)):
     # count lines to later determine max comm rounds
     whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
     read_to_line = int(whole_data.shape[0] * args["pretrain_percent"])
+    if args["pretrain_index"]:
+        read_to_line = args["pretrain_index"]
     min_read_line_num = min(min_read_line_num, read_to_line)
 
 whole_data_record = {} # to calculate scaler
@@ -80,7 +83,7 @@ for detector_file_iter in range(len(all_detector_files)):
     # count lines to later determine max comm rounds
     whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
     whole_data = whole_data[:min_read_line_num]
-    print(f'Loaded {min_read_line_num} lines of data from {detector_file_name} (percentage: {args["pretrain_percent"]}). ({detector_file_iter+1}/{len(all_detector_files)})')
+    print(f'Loaded {min_read_line_num} lines of data from {detector_file_name}. Last training timestamp {whole_data.iloc[min_read_line_num - 1]["Timestamp"]}. ({detector_file_iter+1}/{len(all_detector_files)})')
     whole_data_record[sensor_id] = whole_data
 
     ''' get scaler '''
@@ -94,6 +97,6 @@ for sensor_id, data in whole_data_record.items():
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
     new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
-    new_model.save(f"/content/drive/MyDrive/Hang_PeMS/pretrained_models/{sensor_id}.h5")
+    new_model.save(f"/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/pretrained_models/{sensor_id}.h5")
 
-print(f"Pretrain till line {min_read_line_num}")
+print(f"Pretrain done till line {min_read_line_num} for each detector.")
