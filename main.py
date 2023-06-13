@@ -323,9 +323,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # 1- 24， 2 - 36， 3 - 48， 4 - 60
     else:
         training_data_ending_index = config_vars["start_train_index"] + (comm_round + 1) * new_sample_size_per_comm_round - 1
-        training_data_starting_index = training_data_ending_index - config_vars['max_data_size'] + 1
-        if training_data_starting_index < 1:
-            training_data_starting_index = 0
+        training_data_starting_index = max(config_vars["start_train_index"], training_data_ending_index - config_vars['max_data_size'] + 1)
     # test data
     test_data_starting_index = training_data_ending_index - new_sample_size_per_comm_round + 1
     test_data_ending_index_one_step = test_data_starting_index + new_sample_size_per_comm_round * 2 - 1
