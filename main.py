@@ -93,7 +93,7 @@ parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='thi
 parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')
 
 # argument for enabling learning methods
-parser.add_argument('-lm', '--learning_methods', type=str, default=111111, help='1. baseline centralized stand_alone, 2. pure FedAvg naive_fl, 3. naive same dir same_dir_fl, 4. raidus_fl, 5. same_dir_radius_fl, 6. fav_neighbor')
+parser.add_argument('-lm', '--learning_methods', type=str, default=110101, help='1. baseline centralized stand_alone, 2. pure FedAvg naive_fl, 3. naive same dir same_dir_fl, 4. raidus_fl, 5. same_dir_radius_fl, 6. fav_neighbor')
 # argument for same_dir_fl
 # parser.add_argument('-sdfl', '--same_dir_fl', type=int, default=0, help='1 - enable same_dir_fl; 0 - disable')
 
@@ -306,6 +306,8 @@ else:
 
 print(f"Starting Federated Learning with total comm rounds {run_comm_rounds}...")
 end_train_index = args["start_train_index"] + args["input_length"] * 2 + (run_comm_rounds - 1) * args["input_length"]
+
+print(f"Start training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[args['start_train_index']]['Timestamp']}")
 print(f"End training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1]['Timestamp']}")
 
 for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
