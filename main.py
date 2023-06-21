@@ -248,17 +248,23 @@ else:
         sensor_id = detector_file.split('-')[-1].strip().split(".")[0]
         detector_predicts[sensor_id] = {}
         # baseline 1 - stand_alone
-        detector_predicts[sensor_id]['stand_alone'] = []
+        if int(str(config_vars["learning_methods"])[0]):
+            detector_predicts[sensor_id]['stand_alone'] = []
         # pure FedAvg
-        detector_predicts[sensor_id]['naive_fl'] = []
+        if int(str(config_vars["learning_methods"])[1]):
+            detector_predicts[sensor_id]['naive_fl'] = []
         # same_dir_fl model
-        detector_predicts[sensor_id]['same_dir_fl'] = []
+        if int(str(config_vars["learning_methods"])[2]):
+            detector_predicts[sensor_id]['same_dir_fl'] = []
         # radius pure FedAvg
-        detector_predicts[sensor_id]['radius_naive_fl'] = []
+        if int(str(config_vars["learning_methods"])[3]):
+            detector_predicts[sensor_id]['radius_naive_fl'] = []
         # radius same dir pure FedAvg  
-        detector_predicts[sensor_id]['radius_same_dir_fl'] = []
+        if int(str(config_vars["learning_methods"])[4]):
+            detector_predicts[sensor_id]['radius_same_dir_fl'] = []
         # fav_neighbors_fl model
-        detector_predicts[sensor_id]['fav_neighbors_fl'] = []
+        if int(str(config_vars["learning_methods"])[5]):
+            detector_predicts[sensor_id]['fav_neighbors_fl'] = []
         
         # true
         detector_predicts[sensor_id]['true'] = []
@@ -346,9 +352,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))
         y_true = scaler.inverse_transform(y_true.reshape(-1, 1)).reshape(1, -1)[0]
-        # record data
+        # record test data
         detector.set_X_test(X_test)
         detector.set_y_true(y_true)
+        if comm_round == 1:
+            # at this moment we evaluate the initial model
+            detector_predicts[sensor_id]['true'].append((1,y_train))
         detector_predicts[sensor_id]['true'].append((comm_round + 1,y_true))
         
         ''' Training '''
@@ -356,26 +365,51 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # stand_alone model
         if int(str(config_vars["learning_methods"])[0]):
             print(f"{sensor_id} training stand_alone model.. (1/{len(str(config_vars['learning_methods']))})")
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                stand_alone_predictions = detector.get_stand_alone_model().predict(X_train)
+                stand_alone_predictions = scaler.inverse_transform(stand_alone_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['stand_alone'].append((1,stand_alone_predictions))
             new_model = train_model(detector.get_stand_alone_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, stand_alone_model_path)
         # naive_fl local model
         if int(str(config_vars["learning_methods"])[1]):
             print(f"{sensor_id} training naive_fl local model.. (2/{len(str(config_vars['learning_methods']))})")
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                naive_fl_predictions = detector.get_last_naive_fl_global_model().predict(X_train)
+                naive_fl_predictions = scaler.inverse_transform(naive_fl_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['naive_fl'].append((1,naive_fl_predictions))
             new_model = train_model(detector.get_last_naive_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, naive_fl_local_model_path)
         # same dir fedavg local model
         if int(str(config_vars["learning_methods"])[2]):
             print(f"{sensor_id} training same_dir_fl local model.. (3/{len(str(config_vars['learning_methods']))})")
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                same_dir_fl_predictions = detector.get_last_same_dir_fl_global_model().predict(X_train)
+                same_dir_fl_predictions = scaler.inverse_transform(same_dir_fl_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['same_dir_fl'].append((1,same_dir_fl_predictions))
             new_model = train_model(detector.get_last_same_dir_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, same_dir_fl_local_model_path)
         # radius naive_fl local model
         if int(str(config_vars["learning_methods"])[3]):
             print(f"{sensor_id} training radius_naive_fl local model.. (4/{len(str(config_vars['learning_methods']))})")
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                radius_fl_predictions = detector.get_last_radius_fl_global_model().predict(X_train)
+                radius_fl_predictions = scaler.inverse_transform(radius_fl_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['radius_naive_fl'].append((1,radius_fl_predictions))
             new_model = train_model(detector.get_last_radius_fl_global_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, radius_fl_local_model_path)
         # radius same dir fedavg local model
         if int(str(config_vars["learning_methods"])[4]):
             print(f"{sensor_id} training radius_same_dir_fl local model.. (5/{len(str(config_vars['learning_methods']))})")
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                radius_same_dir_fl_predictions = detector.get_last_radius_same_dir_fl_agg_model().predict(X_train)
+                radius_same_dir_fl_predictions = scaler.inverse_transform(radius_same_dir_fl_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['radius_same_dir_fl'].append((1,radius_same_dir_fl_predictions))
             new_model = train_model(detector.get_last_radius_same_dir_fl_agg_model(), X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, radius_same_dir_fl_local_model_path)
         
@@ -416,7 +450,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     # give reputation
                     # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
                     detector.neighbors_to_rep_score[neighbor.id] = detector.neighbors_to_rep_score.get(neighbor.id, 0) + error_diff
-            
+            if comm_round == 1:
+                # at this moment we evaluate the initial model
+                fav_neighbor_fl_predictions = detector.get_last_fav_neighbors_fl_agg_model().predict(X_train)
+                fav_neighbor_fl_predictions = scaler.inverse_transform(fav_neighbor_fl_predictions.reshape(-1, 1)).reshape(1, -1)[0]
+                detector_predicts[sensor_id]['fav_neighbors_fl'].append((1,fav_neighbor_fl_predictions))
             new_model = train_model(chosen_model, X_train, y_train, config_vars['batch'], config_vars['epochs'])
             detector.update_and_save_model(new_model, comm_round, fav_neighbors_fl_local_model_path)
             # record current comm_round of fav_neighbors for visualization

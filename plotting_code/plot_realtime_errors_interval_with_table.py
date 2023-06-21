@@ -30,6 +30,7 @@ parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit
 parser.add_argument('-si', '--saturation_interval', type=int, default=10, help='used in saturation analysis')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
+parser.add_argument('-sr', '--start_round', type=int, default=1, help='provide the starting communication round, by default the 1st round of the simulation')
 parser.add_argument('-er', '--end_round', type=int, default=None, help='provide the ending communication round, by default the last round of the simulation')
 
 args = parser.parse_args()
@@ -62,7 +63,7 @@ COL = args["column"]
 if ROW != 1 and COL is None:
     sys.exit(f"Please specify the number of columns.")
 ''' load vars '''
-
+start_round = args["start_round"]
 end_round = args["end_round"]
 if not end_round:
     end_round = config_vars["resume_comm_round"] - 1
@@ -106,7 +107,7 @@ def construct_realtime_error_table(realtime_predicts):
       realtime_error_table_normalized[sensor_id] = {}
       
       for model, predicts in models_attr.items():
-        if model != 'true':
+        if predicts and model != 'true':
           realtime_error_table_normalized[sensor_id][model] = {}
           realtime_error_table_normalized[sensor_id][model]['MAE'] = []
           realtime_error_table_normalized[sensor_id][model]['MSE'] = []

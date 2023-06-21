@@ -51,6 +51,14 @@ parser.add_argument('-sp', '--model_save_path', type=str, default="/content/driv
 args = parser.parse_args()
 args = args.__dict__
 
+def reset_random_seeds():
+   os.environ['PYTHONHASHSEED']=str(args["seed"])
+   tf.random.set_seed(args["seed"])
+   np.random.seed(args["seed"])
+   random.seed(args["seed"])
+
+reset_random_seeds()
+
 # read in detector file paths
 all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
 print(f'We have {len(all_detector_files)} detectors available.')
