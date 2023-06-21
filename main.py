@@ -189,6 +189,9 @@ else:
     os.makedirs(f"{logs_dirpath}/check_point", exist_ok=True)
     Detector.logs_dirpath = logs_dirpath
     
+    resume_text = f'To resume, use - \n $ python NeighborFL/main.py -rp "{logs_dirpath}"'
+    print(len(resume_text) * '*', "\n", resume_text, len(resume_text) * '*')
+    
     ''' create detector object and load data for each detector '''
     whole_data_record = {} # to calculate scaler
     individual_min_data_sample = float('inf') # to determine max comm rounds
