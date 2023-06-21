@@ -114,13 +114,12 @@ for round in range(1, args['comm_rounds'] + 1):
     for ind, sensor_id in enumerate(list(all_sensor_ids)):
         print(f"{sensor_id} training ({ind + 1}/{len(all_sensor_ids)})")
         model = train_model(sensor_id_to_model[sensor_id], sensor_id_to_data[sensor_id][0], sensor_id_to_data[sensor_id][1], args['batch'], args['epochs'])
-        sensor_id_to_model[sensor_id] = model
         local_models_weights.append(model.get_weights())
     global_model = create_model(model_units, model_configs)
     global_model.set_weights(np.mean(local_models_weights, axis=0))
     # update each sensor's model
     for ind, sensor_id in enumerate(list(all_sensor_ids)):
-        sensor_id_to_model[sensor_id] = global_model
+        sensor_id_to_model[sensor_id] = deepcopy(global_model)
 
 global_model.save(f"{args['model_save_path']}/global_model.h5")
 print(f"Offline FLTP done for {args['comm_rounds']} comm rounds with {args['epochs']} local epochs till line {min_read_line_num} for each detector.")
