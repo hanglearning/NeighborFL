@@ -4,7 +4,7 @@ import pickle
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import matplotlib.lines as mlines
-
+import math
 import pandas as pd
 
 import sys
@@ -36,9 +36,10 @@ parser.add_argument('-er', '--end_round', type=int, default=None, help='provide 
 args = parser.parse_args()
 args = args.__dict__
 
-'''
-Note that if there was X rounds in FL, the real time predictions were (X-1) rounds rather than X rounds. The first round's prediction will predict for 2nd round, and so. That's why it will plot (-ei - 1) rounds
-'''
+# plot legends
+COLORS = {'stand_alone': 'green', 'naive_fl': 'blue', 'radius_naive_fl': 'orange', 'fav_neighbors_fl': "red"}
+NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL"}
+
 
 ''' load vars '''
 logs_dirpath = args['logs_dirpath']
@@ -61,7 +62,7 @@ all_detector_files = [detector_file.split('.')[0] for detector_file in detector_
 ROW = args["row"]
 COL = args["column"]
 if ROW != 1 and COL is None:
-    sys.exit(f"Please specify the number of columns.")
+    COL = math.ceil(len(all_detector_files) / ROW)
 ''' load vars '''
 start_round = args["start_round"]
 end_round = args["end_round"]
@@ -71,8 +72,59 @@ if not end_round:
 plot_dir_path = f'{logs_dirpath}/plots/realtime_errors_interval'
 os.makedirs(plot_dir_path, exist_ok=True)
 
+def construct_realtime_error_table(realtime_predicts):
+    realtime_error_table_normalized = {}
+    for sensor_file, models_attr in realtime_predicts.items():
+      sensor_id = sensor_file.split('.')[0]
+      realtime_error_table_normalized[sensor_id] = {}
+      xticklabels = [[1]]
+      for model, predicts in models_attr.items():
+        if predicts and model != 'true':
+          realtime_error_table_normalized[sensor_id][model] = {}
+          realtime_error_table_normalized[sensor_id][model]['MAE'] = []
+          realtime_error_table_normalized[sensor_id][model]['MSE'] = []
+          realtime_error_table_normalized[sensor_id][model]['RMSE'] = []
+          realtime_error_table_normalized[sensor_id][model]['MAPE'] = []
+
+          data_list = []
+          true_data_list = []
+          first_round_skip = False
+          for predict_iter in range(len(predicts)):
+            predict = predicts[predict_iter] 
+            # see plot_realtime_learning_curves.py, to be deleted in final version
+            round = predict[0]
+            if round > end_round:
+                break
+            data = predict[1]
+            true_data = models_attr['true'][predict_iter][1]
+            data_list.extend(data)
+            true_data_list.extend(true_data)
+            if (not first_round_skip and (round + 1) % args["error_interval"] == 0) or (first_round_skip and round != args["error_interval"] and round % args["error_interval"] == 0):
+                # conclude the errors
+                realtime_error_table_normalized[sensor_id][model]['MAE'].append(get_MAE(true_data_list, data_list))
+                realtime_error_table_normalized[sensor_id][model]['MSE'].append(get_MSE(true_data_list, data_list))
+                realtime_error_table_normalized[sensor_id][model]['RMSE'].append(get_RMSE(true_data_list, data_list))
+                realtime_error_table_normalized[sensor_id][model]['MAPE'].append(get_MAPE(true_data_list, data_list))
+                data_list = []
+                true_data_list = []
+                first_round_skip = True
+                # deal with xticklabels
+                if model == 'fav_neighbors_fl':
+                    # only need one iteration to form this list (by specifying one model)
+                    xticklabels[-1].append(round)
+                    xticklabels.append([round + 1])
+          # if there's leftover
+          if data_list and true_data_list:
+            realtime_error_table_normalized[sensor_id][model]['MAE'].append(get_MAE(true_data_list, data_list))
+            realtime_error_table_normalized[sensor_id][model]['MSE'].append(get_MSE(true_data_list, data_list))
+            realtime_error_table_normalized[sensor_id][model]['RMSE'].append(get_RMSE(true_data_list, data_list))
+            realtime_error_table_normalized[sensor_id][model]['MAPE'].append(get_MAPE(true_data_list, data_list))
+    
+    xticklabels[-1].append(end_round)
+    return realtime_error_table_normalized, xticklabels
+
 def calculate_errors(realtime_predicts):
-  prediction_errors = {} # prediction_errors[sensor][model][error_type] = [error values based on comm round]
+  prediction_errors = {} # prediction_errors[sensor][model][error_type] = [error values by comm round]
   for sensor_file, models_attr in realtime_predicts.items():
       sensor_id = sensor_file.split('.')[0]
       prediction_errors[sensor_id] = {}
@@ -85,93 +137,17 @@ def calculate_errors(realtime_predicts):
           prediction_errors[sensor_id][model]['RMSE'] = []
           prediction_errors[sensor_id][model]['MAPE'] = []
 
-          processed_rounds = set() # see plot_realtime_learning_curves.py, to be deleted in final version
           for predict in predicts:
             round = predict[0]
             if round > end_round:
                 break
-            if round not in processed_rounds:
-              processed_rounds.add(round)
-              data = predict[1]
-              true_data = models_attr['true'][round - 1][1]
-              prediction_errors[sensor_id][model]['MAE'].append(get_MAE(true_data, data))
-              prediction_errors[sensor_id][model]['MSE'].append(get_MSE(true_data, data))
-              prediction_errors[sensor_id][model]['RMSE'].append(get_RMSE(true_data, data))
-              prediction_errors[sensor_id][model]['MAPE'].append(get_MAPE(true_data, data))
+            data = predict[1]
+            true_data = models_attr['true'][round - 1][1] # round - 1 because index starts from 0
+            prediction_errors[sensor_id][model]['MAE'].append(get_MAE(true_data, data))
+            prediction_errors[sensor_id][model]['MSE'].append(get_MSE(true_data, data))
+            prediction_errors[sensor_id][model]['RMSE'].append(get_RMSE(true_data, data))
+            prediction_errors[sensor_id][model]['MAPE'].append(get_MAPE(true_data, data))
   return prediction_errors
-
-def construct_realtime_error_table(realtime_predicts):
-    realtime_error_table_normalized = {}
-    for sensor_file, models_attr in realtime_predicts.items():
-      sensor_id = sensor_file.split('.')[0]
-      realtime_error_table_normalized[sensor_id] = {}
-      
-      for model, predicts in models_attr.items():
-        if predicts and model != 'true':
-          realtime_error_table_normalized[sensor_id][model] = {}
-          realtime_error_table_normalized[sensor_id][model]['MAE'] = []
-          realtime_error_table_normalized[sensor_id][model]['MSE'] = []
-          realtime_error_table_normalized[sensor_id][model]['RMSE'] = []
-          realtime_error_table_normalized[sensor_id][model]['MAPE'] = []
-
-          processed_rounds = set() # see plot_realtime_learning_curves.py, to be deleted in final version
-          data_list = []
-          true_data_list = []
-          for predict_iter in range(len(predicts)):
-            predict = predicts[predict_iter] 
-            # see plot_realtime_learning_curves.py, to be deleted in final version
-            round = predict[0]
-            if round > end_round:
-                break
-            if round not in processed_rounds:
-              processed_rounds.add(round)
-              data = predict[1]
-              true_data = models_attr['true'][predict_iter][1]
-              data_list.extend(data)
-              true_data_list.extend(true_data)
-              if round != 1 and (round - 1) % args["error_interval"] == 0:
-                # conclude the errors
-                realtime_error_table_normalized[sensor_id][model]['MAE'].append(get_MAE(true_data_list, data_list))
-                realtime_error_table_normalized[sensor_id][model]['MSE'].append(get_MSE(true_data_list, data_list))
-                realtime_error_table_normalized[sensor_id][model]['RMSE'].append(get_RMSE(true_data_list, data_list))
-                realtime_error_table_normalized[sensor_id][model]['MAPE'].append(get_MAPE(true_data_list, data_list))
-                data_list = []
-                true_data_list = []
-          # if there's leftover
-          if data_list and true_data_list:
-            realtime_error_table_normalized[sensor_id][model]['MAE'].append(get_MAE(true_data_list, data_list))
-            realtime_error_table_normalized[sensor_id][model]['MSE'].append(get_MSE(true_data_list, data_list))
-            realtime_error_table_normalized[sensor_id][model]['RMSE'].append(get_RMSE(true_data_list, data_list))
-            realtime_error_table_normalized[sensor_id][model]['MAPE'].append(get_MAPE(true_data_list, data_list))
-    return realtime_error_table_normalized
-  
-
-def plot_realtime_errors_one_by_one(prediction_errors, error_to_plot):
-    for sensor_id, model_nameor in prediction_errors.items():
-        fig = plt.figure()
-        ax = fig.add_subplot(111)
-        print(f"Plotting {error_to_plot} error during real time FL simulation for {sensor_id} with interval {args['error_interval']}.")
-        
-        ax.plot(range(1, len(model_nameor['stand_alone'][error_to_plot]) + 1), model_nameor['stand_alone'][error_to_plot], label='stand_alone', color='#ffb839')
-        
-        ax.plot(range(1, len(model_nameor['naive_fl'][error_to_plot]) + 1), model_nameor['naive_fl'][error_to_plot], label='naive_fl', color='#5a773a')
-        
-        ax.plot(range(1, len(model_nameor['fav_neighbors_fl'][error_to_plot]) + 1), model_nameor['fav_neighbors_fl'][error_to_plot], label='fav_neighbors_fl', color='#5a773a')
-        
-        ax.plot(range(1, len(model_nameor['brute_force'][error_to_plot]) + 1), model_nameor['brute_force'][error_to_plot], label='brute_force', color='#5a773a')
-        
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-        plt.legend()
-        plt.grid(True)
-        plt.xlabel(f"Comm Round with Interval {args['error_interval']}")
-        plt.ylabel('Error')
-        plt.title(f'{sensor_id} - Real Rime {error_to_plot} Error')
-        fig = plt.gcf()
-        # fig.set_size_inches(228.5, 10.5)
-        fig.set_size_inches(10.5, 3.5)
-        print()
-        plt.savefig(f"{plot_dir_path}/{sensor_id}_{error_to_plot}_interval_{args['error_interval']}.png", bbox_inches='tight', dpi=100)
-        plt.show()
 
 def compare_l1_smaller_equal_percent(l1, l2):
   if len(l1) != len(l2):
@@ -195,7 +171,7 @@ def compare_l1_smallest_equal_percent(l1, l2, l3):
     percent_string = f"{percentage:.2%}"
     return percentage, percent_string
 
-def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_compare_model, COL):
+def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_compare_model, COL, xticklabels, width, length, hspace):
 
     sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
     
@@ -206,11 +182,10 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
             max_err = max(model_nameors[error_to_plot])
             ylim = max_err if max_err > ylim else ylim
 
-    # if ROW == 1:
-    #   COL = len(sensor_lists)
     if ROW == 1 and COL is None:
         COL = len(sensor_lists)
-    fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
+    # fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
+    fig, axs = plt.subplots(ROW, COL)
     plt.setp(axs, ylim=(0, ylim))
     if ROW == 1 and COL == 1:
         axs.set_xlabel('Round Range', size=13)
@@ -221,11 +196,6 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
     elif ROW > 1 and COL > 1:
         axs[ROW-1][COL//2].set_xlabel('Round Range', size=13)
         axs[ROW//2][0].set_ylabel(f'{error_to_plot} Value', size=13)
-    
-      
-    # axs[0].set_ylabel(f'{error_to_plot} Error', size=13)
-    # fig.text(0.5, 0.04, 'Comm Round Index', ha='center', size=13)
-    # axs[COL//2].set_xlabel(f'Round Range', size=13)
 
     model_to_red_label_counts = {key: 0 for key in realtime_error_table[list(realtime_error_table.keys())[0]].keys()}
     
@@ -244,53 +214,68 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
         sensor_id = sensor_lists[sensor_plot_iter]
         model_err_normalized = realtime_error_table[sensor_id]
         
-        subplots.set_title(sensor_id)
-        
         num_of_plot_points = len(model_err_normalized[to_compare_model][error_to_plot])
         e_interval = args["error_interval"]
         
-        
-        subplots.set_xticks([0, num_of_plot_points // 2, num_of_plot_points - 1])
-        subplots.set_xticklabels([f'  2-\n{(num_of_plot_points // 2 - 1) * e_interval}', f'{(num_of_plot_points // 2 - 1) * e_interval + 1}-\n{(num_of_plot_points - 1) * e_interval}', f'{(num_of_plot_points - 1) * e_interval + 1}-\n{end_round}'], fontsize=8)
-        
+        # prepare for xticks
+        subplots.set_xticks(range(num_of_plot_points))
+        subplots.set_xticklabels([f'{r[0]}-{r[-1]}' for r in xticklabels], rotation=90)
         
         # start plotting with annotation
-        model_iter = 0
+        model_iter = len(model_err_normalized)
+        
         for model_name in model_err_normalized:
-            if model_name == to_compare_model:
-               continue
-            subplots.plot(range(num_of_plot_points), model_err_normalized[model_name][error_to_plot], label=model_name)
+            subplots.plot(range(num_of_plot_points), model_err_normalized[model_name][error_to_plot], label=model_name, color=COLORS[model_name])
 
             # compare this model vs. to_compare_model (e.g. fav_neighbors_fl) and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put to_compare_model as the first argument to compare_l1_smaller_equal_percent.
 
+            if model_name != to_compare_model:
+                fav_better_percent_val, fav_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model][error_to_plot], model_err_normalized[model_name][error_to_plot])
+                
+                annotation_color = 'black'
+                if fav_better_percent_val >= 0.5:
+                    annotation_color = 'red'
+                    model_to_red_label_counts[model_name] += 1
 
-            fav_better_percent_val, fav_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model][error_to_plot], model_err_normalized[model_name][error_to_plot])
-            
-            annotation_color = 'black'
-            if fav_better_percent_val >= 0.5:
-                annotation_color = 'red'
-                model_to_red_label_counts[model_name] += 1
+                # annotate fav_vs_naive
+                subplots.annotate(f">={model_name}:{fav_better_percent_string}", xy=(num_of_plot_points * 0.4, ylim * 0.65 + model_iter * 0.5), size=8, color=annotation_color)
+                model_iter -= 1
+        
+        # make round range xtick red for the round that NeighborFL is the best model (has the lowest error)
+        # xticklabels = subplots.get_xticklabels()
+        best_ranges = []
+        for round_range_iter in range(num_of_plot_points):
+            min_err_val = float('inf')
+            for model_name in model_err_normalized:
+                min_err_val = min(min_err_val, model_err_normalized[model_name][error_to_plot][round_range_iter])
+            if min_err_val == model_err_normalized[to_compare_model][error_to_plot][round_range_iter]:
+                # xticklabels[round_range_iter].set_color('red')
+                best_ranges.append(round_range_iter)
+        print(sensor_plot_iter, best_ranges)
+        
+        subplots.set_title(sensor_id)
+        
+    # show legend on the last plot
+    if ROW == 1 and COL == 1:
+        lastplot = axs
+    elif ROW == 1 and COL > 1:
+        lastplot = axs[-1]
+    elif ROW > 1 and COL > 1:
+        lastplot = axs[-1][-1]
+    handles = []
+    if sensor_plot_iter == len(sensor_lists) - 1:
+        for model_name in model_err_normalized:
+            vars()[f'{model_name}_curve'] = mlines.Line2D([], [], color=COLORS[model_name], label=NAMES[model_name])
+            handles.append(vars()[f'{model_name}_curve'])
+        
+    lastplot.legend(handles=handles, loc='best', prop={'size': 10})
 
-            # annotate fav_vs_naive
-            subplots.annotate(f">={model_name}:{fav_better_percent_string}", xy=(num_of_plot_points * 0.4, ylim * 0.65), size=8, color=annotation_color)
-        
-        
-        # if sensor_plot_iter == 0:   
-        #   baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
-        #   global_curve = mlines.Line2D([], [], color='#5a773a', label="BFRT")
-        #   if 'same_dir_fl' in model_err_normalized.keys():
-        #     same_dir_curve = mlines.Line2D([], [], color='pink', label="SAME_DIR")
-        #   fav_neighbors_fl_curve = mlines.Line2D([], [], color='blue', label="KFRT")
-        
-        # if 'same_dir_fl' in model_err_normalized.keys():
-        #   subplots.legend(handles=[baseline_curve, global_curve, same_dir_curve, fav_neighbors_fl_curve], loc='best', prop={'size': 10})
-        # else:
-        #    subplots.legend(handles=[baseline_curve, global_curve, fav_neighbors_fl_curve], loc='best', prop={'size': 10})
     # show legend on each plot
-    # baseline_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
-    # global_curve = mlines.Line2D([], [], color='#5a773a', label="FED")    
-    # fig.legend(handles=[baseline_curve, global_curve], loc='upper center')
-    fig.set_size_inches(2 * len(sensor_lists), 3.8)
+    # stand_alone_curve = mlines.Line2D([], [], color='#ffb839', label="BASE")
+    # naive_fl_curve = mlines.Line2D([], [], color='#5a773a', label="FED")    
+
+    fig.subplots_adjust(hspace=hspace)
+    fig.set_size_inches(width, length)
     plt.savefig(f'{plot_dir_path}/real_time_errors_all_sensors_{error_to_plot}.png', bbox_inches='tight', dpi=300)
     # plt.show()
 
@@ -334,7 +319,7 @@ def saturation_analysis(realtime_error_table, err_type, to_compare_model):
     return model_to_beats
 
     
-realtime_error_table = construct_realtime_error_table(detector_predicts)
+realtime_error_table, xticklabels = construct_realtime_error_table(detector_predicts)
 
 # show table
 if False:
@@ -355,11 +340,11 @@ if False:
 # show plots
 all_prediction_errors = calculate_errors(detector_predicts) # calculate global model outperform percentage
 
-# err_type_to_y_top = {"MAE": }
 to_compare_model = 'fav_neighbors_fl'
-for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
+# for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
+for err_type in ["MSE"]:
     print(f"Plotting {err_type}...")
-    plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL)
+    plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL, xticklabels, 16.8, 33.8, 0.5)
     # saturation_analysis(realtime_error_table, err_type, to_compare_model)
     
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
