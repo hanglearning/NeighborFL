@@ -10,6 +10,8 @@ import pandas as pd
 import sys
 import inspect
 
+import numpy as np
+
 currentdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 parentdir = os.path.dirname(currentdir)
 sys.path.insert(0, parentdir) 
@@ -28,7 +30,6 @@ parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the l
 parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting fav_neighbor_fl predictions in -lp file due to different kick strategy')
 parser.add_argument('-lp3', '--logs_dirpath3', type=str, default=None, help='to add offline_fl predictions')
 parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
-parser.add_argument('-si', '--saturation_interval', type=int, default=10, help='used in saturation analysis')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-sr', '--start_round', type=int, default=1, help='provide the starting communication round, by default the 1st round of the simulation')
@@ -87,6 +88,7 @@ def construct_realtime_error_table(realtime_predicts):
       realtime_error_table_normalized[sensor_id] = {}
       xticklabels = [[1]]
       for model, predicts in models_attr.items():
+        # if predicts and model != 'true' and model != 'offline_fl':
         if predicts and model != 'true':
           realtime_error_table_normalized[sensor_id][model] = {}
           realtime_error_table_normalized[sensor_id][model]['MAE'] = []
@@ -248,7 +250,19 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
                 # annotate fav_vs_naive
                 subplots.annotate(f">={model_name}:{fav_better_percent_string}", xy=(num_of_plot_points * 0.4, ylim * 0.65 + model_iter * 0.5), size=8, color=annotation_color)
                 model_iter -= 1
-        
+
+        # model evolvement analysis
+        # make round range xtick red for the round that NeighborFL beats NaiveFL
+        iters = []
+        # xticklabels = subplots.get_xticklabels()
+        xtickreds = np.array(model_err_normalized['fav_neighbors_fl'][error_to_plot]) <= np.array(model_err_normalized['stand_alone'][error_to_plot])
+        for iter, is_red  in enumerate(xtickreds):
+            if is_red:
+                # xticklabels[iter].set_color('red')
+                iters.append(iter + 1)
+        print(sensor_id, iters)
+                
+                
         subplots.set_title(sensor_id)
         
     # show legend on the last plot
@@ -279,41 +293,6 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
     for model_name in model_to_red_label_counts:
        print(f"fav_beats_{model_name}: {model_to_red_label_counts[model_name]}")
 
-def saturation_analysis(realtime_error_table, err_type, to_compare_model):
-
-    sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
-
-    si = args["saturation_interval"]
-    model_to_beats = {key: [] for key in realtime_error_table[list(realtime_error_table.keys())[0]].keys()}
-
-    for ind_iter in range(args["end_round"] // si):
-    
-        model_to_beat_counts = {key: 0 for key in realtime_error_table[list(realtime_error_table.keys())[0]].keys()}
-        
-        for sensor_plot_iter in range(len(sensor_lists)):
-            
-            sensor_id = sensor_lists[sensor_plot_iter]
-            model_err_normalized = realtime_error_table[sensor_id]
-            
-            # start plotting with annotation
-            model_iter = 0
-            for model_name in model_err_normalized:
-                if model_name == to_compare_model:
-                    continue
-                
-                fav_better_percent_val, fav_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model][err_type][ind_iter * si: ind_iter * si + si], model_err_normalized[model_name][err_type][ind_iter * si: ind_iter * si + si])
-                
-                if fav_better_percent_val >= 0.5:
-                    model_to_beat_counts[model_name] += 1
-                
-        for model_name, value in model_to_beat_counts.items():
-            model_to_beats[model_name].append(value)
-
-    # for model_name, beats in model_to_beats.items():
-    #    plt.plot(range(len(beats)), beats, model_name)
-    # plt.savefig(f'{plot_dir_path}/saturation_analysis.png', bbox_inches='tight', dpi=300)
-    return model_to_beats
-
     
 realtime_error_table, xticklabels = construct_realtime_error_table(detector_predicts)
 
@@ -337,11 +316,10 @@ if False:
 all_prediction_errors = calculate_errors(detector_predicts) # calculate global model outperform percentage
 
 to_compare_model = 'fav_neighbors_fl'
-# for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
-for err_type in ["MSE"]:
+for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
+# for err_type in ["MSE"]:
     print(f"Plotting {err_type}...")
     plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL, xticklabels, 16.8, 33.8, 0.5)
-    # saturation_analysis(realtime_error_table, err_type, to_compare_model)
     
 # error_ylim = dict(MAE = 200, MSE = 6000, RMSE = 80, MAPE = 0.6)
 # for error_type in error_ylim.keys():

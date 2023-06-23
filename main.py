@@ -316,7 +316,8 @@ print(f"Starting Federated Learning with total comm rounds {run_comm_rounds}..."
 end_train_index = args["start_train_index"] + args["input_length"] * 2 + (run_comm_rounds - 1) * args["input_length"]
 
 print(f"Start training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[args['start_train_index']]['Timestamp']}")
-print(f"End training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1]['Timestamp']}")
+print(f"End training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1 - INPUT_LENGTH]['Timestamp']}")
+print(f"End predicting Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1]['Timestamp']}")
 	
 for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds): 
     # in round n, we record test data of round n+1, which is the true data of n+1, so do not need run_comm_rounds+1 in range(STARTING_COMM_ROUND, run_comm_rounds). The simulation will only run args["comm_rounds"]-1 communication rounds.
