@@ -58,8 +58,8 @@ class Detector:
         self.neighbor_fl_error_records = []
         self.has_added_neigbor = False # used as one of the conditions to determine whether to kick a fav neighbor
 
-    def assign_neighbors(self, list_of_detectors):
-        for detector_id, detector in list_of_detectors.items():
+    def assign_neighbors(self, whole_data_record):
+        for detector_id, detector in whole_data_record.items():
             if detector == self:
                 continue
             distance = haversine(self.loc, detector.loc, unit='mi')

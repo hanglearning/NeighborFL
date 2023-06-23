@@ -44,10 +44,10 @@ args = args.__dict__
 
 ''' Variables Required '''
 logs_dirpath = args["logs_dirpath"]
-with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
-		config_vars = pickle.load(f)
+with open(f"{logs_dirpath}/check_point/args.pkl", 'rb') as f:
+		args = pickle.load(f)
                 
-input_length = config_vars["input_length"]
+input_length = args["input_length"]
 plot_last_comm_rounds = args["plot_last_comm_rounds"] # to plot last plot_last_comm_rounds hours
 time_res = args["time_resolution"]
 sing_x_density = args["single_plot_x_axis_density"]
@@ -107,7 +107,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     ax.set_title(detector_id)
 
-    resume_comm_round = config_vars["resume_comm_round"]
+    resume_comm_round = args["resume_comm_round"]
 
     if not args["starting_comm_round"]:
         s_round = int(resume_comm_round - plot_last_comm_rounds)
@@ -125,7 +125,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     # my_xticks.appendleft(0)
     
     ax.set_xticks(my_xticks)
-    # xticklabels = list(range(config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds, config_vars["resume_comm_round"], sing_x_density))
+    # xticklabels = list(range(args["resume_comm_round"] - 1 - plot_last_comm_rounds, args["resume_comm_round"], sing_x_density))
     xticklabels = list(range(s_round, e_round + 1, sing_x_density))
     # xticklabels[0] = 1
     ax.set_xticklabels(xticklabels, fontsize = 9, rotation = 45)
@@ -180,7 +180,7 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     
     
     my_xticks = [0, plotting_range//2, plotting_range-2]
-    # my_xticklabels = [config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds + 1, config_vars["resume_comm_round"] - 1 - plot_last_comm_rounds//2 + 1, config_vars["resume_comm_round"] - 1]
+    # my_xticklabels = [args["resume_comm_round"] - 1 - plot_last_comm_rounds + 1, args["resume_comm_round"] - 1 - plot_last_comm_rounds//2 + 1, args["resume_comm_round"] - 1]
     my_xticklabels = [s_round, math.ceil((s_round + e_round)/2), e_round]
     
     

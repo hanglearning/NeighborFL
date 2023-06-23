@@ -43,9 +43,9 @@ NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-
 
 ''' load vars '''
 logs_dirpath = args['logs_dirpath']
-with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
-    config_vars = pickle.load(f)
-# all_detector_files = config_vars["all_detector_files"]
+with open(f"{logs_dirpath}/check_point/args.pkl", 'rb') as f:
+    args = pickle.load(f)
+# all_detector_files = args["all_detector_files"]
 with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
 
@@ -67,7 +67,7 @@ if ROW != 1 and COL is None:
 start_round = args["start_round"]
 end_round = args["end_round"]
 if not end_round:
-    end_round = config_vars["resume_comm_round"] - 1
+    end_round = args["resume_comm_round"] - 1
 
 plot_dir_path = f'{logs_dirpath}/plots/realtime_errors_interval'
 os.makedirs(plot_dir_path, exist_ok=True)
@@ -240,18 +240,6 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
                 # annotate fav_vs_naive
                 subplots.annotate(f">={model_name}:{fav_better_percent_string}", xy=(num_of_plot_points * 0.4, ylim * 0.65 + model_iter * 0.5), size=8, color=annotation_color)
                 model_iter -= 1
-        
-        # make round range xtick red for the round that NeighborFL is the best model (has the lowest error)
-        # xticklabels = subplots.get_xticklabels()
-        best_ranges = []
-        for round_range_iter in range(num_of_plot_points):
-            min_err_val = float('inf')
-            for model_name in model_err_normalized:
-                min_err_val = min(min_err_val, model_err_normalized[model_name][error_to_plot][round_range_iter])
-            if min_err_val == model_err_normalized[to_compare_model][error_to_plot][round_range_iter]:
-                # xticklabels[round_range_iter].set_color('red')
-                best_ranges.append(round_range_iter)
-        print(sensor_plot_iter, best_ranges)
         
         subplots.set_title(sensor_id)
         
