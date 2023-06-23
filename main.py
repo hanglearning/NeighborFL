@@ -360,6 +360,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds):
         detector.set_y_true(y_true)
         if comm_round == 1:
             # at this moment we evaluate the initial model
+            y_train = scaler.inverse_transform(y_train.reshape(-1, 1)).reshape(1, -1)[0]
             detector_predicts[sensor_id]['true'].append((1,y_train))
         detector_predicts[sensor_id]['true'].append((comm_round + 1,y_true))
         
