@@ -34,15 +34,15 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 # arguments for system vars
 parser.add_argument('-mp', '--model_path', type=str, default='/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/offline_FLTP_model/global_model.h5', help='The path of global model for every detector')
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS_csvs', help='dataset path')
-parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_PeMS/KFRT_logs", help='base folder path to store running logs and h5 files')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
+parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_NeighborFL/NeighborFL_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 
 # arguments for prediction
 parser.add_argument('-il', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
 parser.add_argument('-ff', '--num_feedforward', type=int, default=12, help='number of feedforward predictions, used to set up the number of the last layer of the model (usually it has to be equal to -il)')
 parser.add_argument('-si', '--start_index', type=int, default=0, help='the index to start taking data for prediction')
-parser.add_argument('-ms', '--max_data_size', type=int, default=24, help='maximum data length for training in each communication comm_round, simulating the memory space a detector has') # only used on Comm round 1
+parser.add_argument('-ms', '--max_data_size', type=int, default=72, help='maximum data length for training in each communication comm_round, simulating the memory space a detector has') # only used on Comm round 1
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=335, help='number of comm rounds, default aims to run until data is exhausted')
@@ -75,7 +75,7 @@ detector_predicts = {}
 for detector_file in all_detector_files:
     sensor_id = detector_file.split('-')[-1].strip().split(".")[0]
     detector_predicts[sensor_id] = {}
-    detector_predicts[sensor_id]['offline_fl_preds'] = []
+    detector_predicts[sensor_id]['offline_fl'] = []
     # true
     detector_predicts[sensor_id]['true'] = []
     
@@ -97,7 +97,7 @@ global_model = load_model(args["model_path"], compile = False)
 
 run_comm_rounds = args["comm_rounds"]
 
-for comm_round in range(1, run_comm_rounds + 1):
+for comm_round in range(1, run_comm_rounds):
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
@@ -141,14 +141,14 @@ for comm_round in range(1, run_comm_rounds + 1):
             detector_predicts[sensor_id]['true'].append((1,y_train))
             offline_predictions = global_model.predict(X_train)
             offline_predictions = scaler.inverse_transform(offline_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-            detector_predicts[sensor_id]['offline_fl_preds'].append((1,offline_predictions))
+            detector_predicts[sensor_id]['offline_fl'].append((1,offline_predictions))
         
         ''' Predict '''
         detector_predicts[sensor_id]['true'].append((comm_round + 1,y_true))
         print(f"{sensor_id} is now predicting by offline FLTP global model...")
         offline_predictions = global_model.predict(X_test)
         offline_predictions = scaler.inverse_transform(offline_predictions.reshape(-1, 1)).reshape(1, -1)[0]
-        detector_predicts[sensor_id]['offline_fl_preds'].append((comm_round + 1,offline_predictions))
+        detector_predicts[sensor_id]['offline_fl'].append((comm_round + 1,offline_predictions))
 
         detecotr_iter += 1
     

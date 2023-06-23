@@ -50,8 +50,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="NeighborFL Simulation")
 
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS_csvs', help='dataset path')
-parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_PeMS/KFRT_logs", help='base folder path to store running logs and h5 files')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
+parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_NeighborFL/NeighborFL_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 parser.add_argument('-dir', '--direction', type=int, default=1, help='also do fedavg within only N or S')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
@@ -319,7 +319,8 @@ end_train_index = args["start_index"] + args["input_length"] * 2 + (run_comm_rou
 print(f"Start training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[args['start_index']]['Timestamp']}")
 print(f"End training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1]['Timestamp']}")
 
-for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
+for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds): 
+    # in round n, we record test data of round n+1, which is the true data of n+1, so do not need run_comm_rounds+1 in range(STARTING_COMM_ROUND, run_comm_rounds). The simulation will only run args["comm_rounds"]-1 communication rounds.
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
     ''' calculate simulation data range '''
     # train data
