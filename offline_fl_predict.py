@@ -117,7 +117,7 @@ for comm_round in range(1, run_comm_rounds):
     test_data_ending_index_chained_multi = test_data_starting_index + new_sample_size_per_comm_round - 1
     
     detecotr_iter = 1
-    for sensor_id, detector in whole_data_record.items():
+    for sensor_id in whole_data_record:
         ''' Process traning data '''
         if comm_round == 1:
             # special dealing
@@ -152,13 +152,15 @@ for comm_round in range(1, run_comm_rounds):
 
         detecotr_iter += 1
     
-    print(f"Saving progress for comm_round {comm_round}...")
+    print(f"Saving progress for comm_round {comm_round} and predictions in comm_round {comm_round + 1}...")
     
     print("Saving Predictions...")                          
     predictions_record_saved_path = f'{logs_dirpath}/all_detector_predicts.pkl'
     with open(predictions_record_saved_path, 'wb') as f:
         pickle.dump(detector_predicts, f)
-    
+
+print(f"Simulation done for specified comm rounds. \nIn this simulation, the last run comm rounds should be {comm_round - 1}. This is not a surprise due to the code structure that makes predictions for round n + 1 in round n.")
+
 
 
     

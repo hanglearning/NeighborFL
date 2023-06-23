@@ -25,8 +25,8 @@ from tabulate import tabulate
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="inferencing code")
 
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
-parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='if this presents, overwrites the fav_neighbor_fl in -lp')
-parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
+parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting fav_neighbor_fl predictions in -lp file due to different kick strategy')
+parser.add_argument('-lp3', '--logs_dirpath3', type=str, default=None, help='to add offline_fl predictions')parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
 parser.add_argument('-si', '--saturation_interval', type=int, default=10, help='used in saturation analysis')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
@@ -37,15 +37,15 @@ args = parser.parse_args()
 args = args.__dict__
 
 # plot legends
-COLORS = {'stand_alone': 'green', 'naive_fl': 'blue', 'radius_naive_fl': 'orange', 'fav_neighbors_fl': "red"}
-NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL"}
+COLORS = {'stand_alone': 'green', 'naive_fl': 'blue', 'radius_naive_fl': 'orange', 'fav_neighbors_fl': "red", "offline_fl": "grey"}
+NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL", "offline_fl": "OfflineFL"}
 
 
 ''' load vars '''
 logs_dirpath = args['logs_dirpath']
-with open(f"{logs_dirpath}/check_point/args.pkl", 'rb') as f:
-    args = pickle.load(f)
-# all_detector_files = args["all_detector_files"]
+with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
+    config_vars = pickle.load(f)
+# all_detector_files = config_vars["all_detector_files"]
 with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
     detector_predicts = pickle.load(f)
 
@@ -55,7 +55,14 @@ try:
         for detector in detector_predicts:
            detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
 except:
-    print("-lp2 not provided or not valid")
+    print("-lp2 for overwriting fav_neighbor_fl in -lp1 not provided or not valid")
+try:
+    with open(f"{args['logs_dirpath3']}/all_detector_predicts.pkl", 'rb') as f:
+        offline_fl_predicts = pickle.load(f)
+        for detector in detector_predicts:
+           detector_predicts[detector]['offline_fl'] = offline_fl_predicts[detector]['offline_fl']
+except:
+    print("-lp3 for adding offline_fl predictions not provided or not valid")
 
 all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
     
@@ -67,7 +74,7 @@ if ROW != 1 and COL is None:
 start_round = args["start_round"]
 end_round = args["end_round"]
 if not end_round:
-    end_round = args["resume_comm_round"] - 1
+    end_round = config_vars["resume_comm_round"] - 1
 
 plot_dir_path = f'{logs_dirpath}/plots/realtime_errors_interval'
 os.makedirs(plot_dir_path, exist_ok=True)
