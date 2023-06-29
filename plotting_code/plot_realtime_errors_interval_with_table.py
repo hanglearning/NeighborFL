@@ -28,8 +28,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting fav_neighbor_fl predictions in -lp file due to different kick strategy')
-parser.add_argument('-lp3', '--logs_dirpath3', type=str, default=None, help='to add offline_fl predictions')
-parser.add_argument('-ei', '--error_interval', type=int, default=100, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
+parser.add_argument('-ei', '--error_interval', type=int, default=24, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-sr', '--start_round', type=int, default=1, help='provide the starting communication round, by default the 1st round of the simulation')
@@ -39,8 +38,8 @@ args = parser.parse_args()
 args = args.__dict__
 
 # plot legends
-COLORS = {'stand_alone': 'green', 'naive_fl': 'blue', 'radius_naive_fl': 'orange', 'fav_neighbors_fl': "red", "offline_fl": "grey"}
-NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL", "offline_fl": "OfflineFL"}
+COLORS = {'stand_alone': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'fav_neighbors_fl': "red"}
+NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL"}
 
 
 ''' load vars '''
@@ -56,15 +55,9 @@ try:
         fav_predicts = pickle.load(f)
         for detector in detector_predicts:
            detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
+        logs_dirpath = args["logs_dirpath2"]
 except:
     print("-lp2 for overwriting fav_neighbor_fl in -lp1 not provided or not valid")
-try:
-    with open(f"{args['logs_dirpath3']}/all_detector_predicts.pkl", 'rb') as f:
-        offline_fl_predicts = pickle.load(f)
-        for detector in detector_predicts:
-           detector_predicts[detector]['offline_fl'] = offline_fl_predicts[detector]['offline_fl']
-except:
-    print("-lp3 for adding offline_fl predictions not provided or not valid")
 
 all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
     
@@ -88,8 +81,7 @@ def construct_realtime_error_table(realtime_predicts):
       realtime_error_table_normalized[sensor_id] = {}
       xticklabels = [[1]]
       for model, predicts in models_attr.items():
-        # if predicts and model != 'true' and model != 'offline_fl':
-        if predicts and model != 'true':
+        if predicts and model != 'true' and model != 'offline_fl':
           realtime_error_table_normalized[sensor_id][model] = {}
           realtime_error_table_normalized[sensor_id][model]['MAE'] = []
           realtime_error_table_normalized[sensor_id][model]['MSE'] = []
@@ -131,6 +123,8 @@ def construct_realtime_error_table(realtime_predicts):
             realtime_error_table_normalized[sensor_id][model]['MAPE'].append(get_MAPE(true_data_list, data_list))
     
     xticklabels[-1].append(end_round)
+    if args["error_interval"] == 1:
+       xticklabels = [[r] for r in range(1, len(xticklabels))]
     return realtime_error_table_normalized, xticklabels
 
 def calculate_errors(realtime_predicts):
@@ -188,9 +182,10 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
     # determine y_top (ylim)
     ylim = 0
     for realtime_errors in realtime_error_table.values():
-        for model_nameors in realtime_errors.values():
-            max_err = max(model_nameors[error_to_plot])
+        for model_errors in realtime_errors.values():
+            max_err = max(model_errors[error_to_plot])
             ylim = max_err if max_err > ylim else ylim
+    ylim = min(20, ylim) # top threshold otherwise the curves in some plots are too flat
 
     if ROW == 1 and COL is None:
         COL = len(sensor_lists)
@@ -251,16 +246,16 @@ def plot_realtime_errors_all_sensors(realtime_error_table, error_to_plot, to_com
                 subplots.annotate(f">={model_name}:{fav_better_percent_string}", xy=(num_of_plot_points * 0.4, ylim * 0.65 + model_iter * 0.5), size=8, color=annotation_color)
                 model_iter -= 1
 
-        # model evolvement analysis
-        # make round range xtick red for the round that NeighborFL beats NaiveFL
-        iters = []
-        # xticklabels = subplots.get_xticklabels()
-        xtickreds = np.array(model_err_normalized['fav_neighbors_fl'][error_to_plot]) <= np.array(model_err_normalized['stand_alone'][error_to_plot])
-        for iter, is_red  in enumerate(xtickreds):
-            if is_red:
-                # xticklabels[iter].set_color('red')
-                iters.append(iter + 1)
-        print(sensor_id, iters)
+        # # model evolvement analysis
+        # # make round range xtick red for the round that NeighborFL beats NaiveFL
+        # iters = []
+        # # xticklabels = subplots.get_xticklabels()
+        # xtickreds = np.array(model_err_normalized['fav_neighbors_fl'][error_to_plot]) <= np.array(model_err_normalized['stand_alone'][error_to_plot])
+        # for iter, is_red  in enumerate(xtickreds):
+        #     if is_red:
+        #         # xticklabels[iter].set_color('red')
+        #         iters.append(iter + 1)
+        # print(sensor_id, iters)
                 
                 
         subplots.set_title(sensor_id)
@@ -316,8 +311,8 @@ if False:
 all_prediction_errors = calculate_errors(detector_predicts) # calculate global model outperform percentage
 
 to_compare_model = 'fav_neighbors_fl'
-for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
-# for err_type in ["MSE"]:
+# for err_type in ["MAE", "MSE", "MAPE", "RMSE"]:
+for err_type in ["MSE"]:
     print(f"Plotting {err_type}...")
     plot_realtime_errors_all_sensors(realtime_error_table, err_type, to_compare_model, COL, xticklabels, 16.8, 33.8, 0.5)
     
