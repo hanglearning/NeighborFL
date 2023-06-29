@@ -189,7 +189,7 @@ else:
     Detector.logs_dirpath = logs_dirpath
     
     resume_text = f'To resume, use - \n $ python NeighborFL/main.py -rp "{logs_dirpath}"'
-    print(len(resume_text) * '*', "\n", resume_text, len(resume_text) * '*')
+    print(len(resume_text) * '*', "\n", resume_text, "\n", len(resume_text) * '*')
     
     ''' create detector object and load data for each detector '''
     whole_data_record = {} # to calculate scaler
@@ -322,6 +322,7 @@ print(f"End predicting Timestamp (inclusive): {whole_data_record[list(whole_data
 for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds): 
     # in round n, we record test data of round n+1, which is the true data of n+1, so do not need run_comm_rounds+1 in range(STARTING_COMM_ROUND, run_comm_rounds). The simulation will only run args["comm_rounds"]-1 communication rounds.
     print(f"Simulating comm comm_round {comm_round}/{run_comm_rounds} ({comm_round/run_comm_rounds:.0%})...")
+    start_time = datetime.now()
     ''' calculate simulation data range '''
     # train data
     if comm_round == 1:
@@ -713,7 +714,8 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds):
             ''' at the end of FL for loop '''
             detecotr_iter += 1
 
-    
+    end_time = datetime.now()
+    print(f"Comm round {comm_round} takes {(end_time-start_time).total_seconds() / 60} minutes.")
     
     print(f"Saving progress for comm_round {comm_round} and predictions in comm_round {comm_round + 1}...")
 
@@ -734,5 +736,5 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds):
     with open(f"{logs_dirpath}/check_point/list_of_detectors.pkl", 'wb') as f:
         pickle.dump(list_of_detectors, f)
 
-print(f"Simulation done for specified comm rounds. \nIn this simulation, the last run comm rounds should be {comm_round - 1}. This is not a surprise due to the code structure that makes predictions for round n + 1 in round n.")
+print(f"Simulation done for specified comm rounds. \nIn this simulation, the last run comm rounds should be {args['comm_rounds']}. This is not a surprise due to the code structure that makes predictions for round n + 1 in round n.")
     
