@@ -86,7 +86,7 @@ parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heurist
 # arguments for fav_neighbor kicking
 parser.add_argument('-kt', '--kick_trigger', type=int, default=2, help='to trigger a kick: 0 - never kick; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -kr')
 parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -kt 1, detector has a probability to kick out worst neighbors to explore new neighbors')
-parser.add_argument('-kr', '--kick_rounds', type=int, default=3, help="if -kt 2, a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for -kr number of rounds")
+parser.add_argument('-kr', '--kick_rounds', type=int, default=3, help="a kick will be triggered if the error of the detector's fav_neighbor agg model has been increasing for -kr number of rounds. if -kt 1, a kick is triggered as soon as the error increases")
 parser.add_argument('-kn', '--kick_num', type=int, default=1, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
 parser.add_argument('-kp', '--kick_percent', type=float, default=None, help='this number defines how many percent of of neighboring detecotors to kick having the worst reputation.  Default to 0.25.  Either this or -kn has to be specified, if both specified, randomly chosen')
 parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')

@@ -8,6 +8,7 @@ from collections import deque
 import math
 
 import pandas as pd
+import numpy as np
 from tabulate import tabulate
 
 import sys
@@ -34,16 +35,18 @@ parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help
 parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, default to 5 mins')
 parser.add_argument('-nsx', '--num_sing_xticks', type=int, default=12, help='how many x-axes (xticks) on single detector plot, usually should set to same as plot_rounds')
 parser.add_argument('-nmx', '--num_mul_xticks', type=int, default=4, help='how many x-axes (xticks) on multiple detectors plot')
-parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. By default, it is kind of random')
+parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. If not speified, no single figure will be generated')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
 parser.add_argument('-attr', '--attribute', type=str, default='Speed', help='prediciting feature')
 
-COLORS = {'stand_alone': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'fav_neighbors_fl': "red", 'true': 'blue'}
-NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'R-NaiveFL', 'fav_neighbors_fl': "NeighborFL", 'true': 'TRUE'}
-
 args = parser.parse_args()
 args = args.__dict__
+
+neighbor_fl_config = args["logs_dirpath2"].split("/")[-1] if args["logs_dirpath2"] else args["logs_dirpath"].split("/")[-1]
+
+COLORS = {'stand_alone': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'fav_neighbors_fl': "red", 'true': 'blue'}
+NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'fav_neighbors_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
 
 ''' Variables Required - Below '''
 logs_dirpath = args["logs_dirpath"]
@@ -118,53 +121,46 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     Plot the true data and predicted data.
     """
     
-    # draw 1 plot
-    # for detector_id in detector_lists:
-    fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
-    plt.setp(ax, ylim=(0, 100))
-    fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical')
-    ax.set_xlabel('Round Index')
-    detector_id = args['representative']
-    
-    ax.set_title(detector_id)
-    
-    plotting_range = int(60/time_res * plot_rounds)
-    
-    my_xticks = deque([i for i in range(0, plotting_range, num_sing_xticks)])
-    # my_xticks = deque([i for i in range(num_sing_xticks - 1, plotting_range, num_sing_xticks)])
-    # head tick
-    # my_xticks.appendleft(0)
-    # tail tick
-    # if my_xticks[-1] != plotting_range - 1:
-    #     my_xticks.append(plotting_range - 1)    
-    ax.set_xticks(my_xticks)
-    
-    xticklabels = list(range(s_round, s_round + plot_rounds))
-    if xticklabels[-1] != s_round + plot_rounds - 1:
-        xticklabels.append(s_round + plot_rounds - 1) # e_round
-    ax.set_xticklabels(xticklabels, fontsize = 9, rotation = 45)
+    # draw 1 representative plot
+    rep_sensor_id = args['representative']
+    if rep_sensor_id:
+        fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
+        plt.setp(ax, ylim=(15, 75))
+        fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical')
+        ax.set_xlabel('Round Index')
+        
+        ax.set_title(rep_sensor_id)
+        
+        plotting_range = int(60/time_res * plot_rounds)
+        
+        my_xticks = deque([i for i in range(0, plotting_range, num_sing_xticks)])   
+        ax.set_xticks(my_xticks)
+        
+        xticklabels = list(range(s_round, s_round + plot_rounds))
+        if xticklabels[-1] != s_round + plot_rounds - 1:
+            xticklabels.append(s_round + plot_rounds - 1) # e_round
+        ax.set_xticklabels(xticklabels, fontsize = 9)
 
-    # plot data
-    legend_handles = []
-    for model in plot_data[detector_id]:
-        if plot_data[detector_id][model]:
-            to_plot = plot_data[detector_id][model]
-            ax.plot(range(len(to_plot)), to_plot, label=NAMES[model], color=COLORS[model])
-            legend_handles.append(mlines.Line2D([], [], color=COLORS[model], label=NAMES[model]))
-    
-    ax.legend(handles=legend_handles, loc='best', prop={'size': 10})
-    
-    fig.set_size_inches(20, 4) # width, height
-    plt.savefig(f'{plot_dir_path}/single_figure.png', bbox_inches='tight', dpi=500)
-    # plt.show()
+        # plot data
+        legend_handles = []
+        for model in plot_data[rep_sensor_id]:
+            if plot_data[rep_sensor_id][model]:
+                to_plot = plot_data[rep_sensor_id][model]
+                ax.plot(range(len(to_plot)), to_plot, label=NAMES[model], color=COLORS[model])
+                legend_handles.append(mlines.Line2D([], [], color=COLORS[model], label=NAMES[model]))
+        
+        ax.legend(handles=legend_handles, loc='best', prop={'size': 10})
+        
+        fig.set_size_inches(10, 2) # width, height
+        plt.savefig(f'{plot_dir_path}/single_figure_{rep_sensor_id}_.png', bbox_inches='tight', dpi=500)
+        # plt.show()
 
-    
     # draw subplots
     if ROW == 1 and COL is None:
         # COL = len(detector_lists) - 1
         COL = len(detector_lists)
     fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
-    plt.setp(axs, ylim=(0, 100))
+    plt.setp(axs, ylim=(0, 75))
     # axs[0].set_ylabel(args['attribute'])
     # fig.text(0.5, 0.04, 'Round Index', ha='center', size=13)
     fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical', size=13)
@@ -180,8 +176,9 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     # my_xticklabels = [config_vars["last_comm_round"] - 1 - plot_rounds + 1, config_vars["last_comm_round"] - 1 - plot_rounds//2 + 1, config_vars["last_comm_round"] - 1]
     my_xticklabels = [s_round, math.ceil((s_round + e_round)/2), e_round]
     
-    
-    detector_lists.remove(args['representative'])
+    if rep_sensor_id:
+        detector_lists.remove(rep_sensor_id)
+
     for detector_plot_iter in range(len(detector_lists)):
         row = detector_plot_iter // COL
         col = detector_plot_iter % COL
@@ -195,7 +192,8 @@ def plot_and_save_two_rows(detector_lists, plot_data):
         
         detector_id = detector_lists[detector_plot_iter]
         # subplots.set_xlabel('Comm Round')
-        subplots.set_title(detector_id, fontsize=30)
+        # subplots.set_title(detector_id, fontsize=30)
+        subplots.set_title(detector_id)
         
         
         subplots.set_xticks(my_xticks)
@@ -210,8 +208,9 @@ def plot_and_save_two_rows(detector_lists, plot_data):
                 legend_handles.append(mlines.Line2D([], [], color=COLORS[model], label=NAMES[model]))
         
         # subplots.legend(handles=legend_handles, loc='best', prop={'size': 10})
-        
-    fig.set_size_inches(50, 26)
+    
+    # fig.subplots_adjust(hspace=1)
+    fig.set_size_inches(10, 10)
     plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
     # plt.show()
 
@@ -225,12 +224,51 @@ def calculate_errors_and_output_table(plot_data, err_type):
                 model_to_error[model] = globals()[f'get_{err_type}'](prediction_method['true'], predicts)
         detetor_id_to_model_errors[detector_id] = model_to_error
     
-    err_df = pd.DataFrame([detetor_id_to_model_errors[detector_id] for detector_id in plot_data], columns=list(detetor_id_to_model_errors[detector_id].keys()), index=list(detetor_id_to_model_errors.keys()))
-    err_df.to_csv(f'{plot_dir_path}/errors.csv')
-    print()
+    avg_model_error_by_detector = detetor_id_to_model_errors
+    
+    columns = list(detetor_id_to_model_errors[detector_id].keys())
+    err_df = pd.DataFrame([detetor_id_to_model_errors[detector_id] for detector_id in plot_data], columns=columns, index=list(detetor_id_to_model_errors.keys()))
+    err_df.rename(columns={old:new for old, new in zip(columns, [NAMES[n] for n in columns])}, inplace=True)
+
+    # ChatGPT generated
+
+    # Create a Pandas Excel writer using XlsxWriter as the engine.
+    writer = pd.ExcelWriter(f'{plot_dir_path}/{err_type}_errors_rounds_{s_round}_{e_round}.xlsx', engine='xlsxwriter')
+
+    # Convert the dataframe to an XlsxWriter Excel object.
+    err_df.to_excel(writer, sheet_name='Sheet1')
+
+    # Get the xlsxwriter workbook and worksheet objects.
+    workbook  = writer.book
+    worksheet = writer.sheets['Sheet1']
 
 
+    # Apply conditional formatting to highlight the minimum value in each row
+    format_rule = workbook.add_format({'bg_color': '#90EE90'})
+    worksheet.conditional_format('B2:E27', {'type': 'formula', 'criteria': '=B2=MIN($B2:$E2)', 'format': format_rule})
+
+    # Save the workbook
+    writer.save()
+
+    # err_df.to_csv(f'{plot_dir_path}/{err_type}_errors_rounds_{s_round}_{e_round}.csv')
+
+    return avg_model_error_by_detector
+
+def calc_average_prediction_error(avg_model_error_by_detector, error_type):
+    model_to_errors_accum = {}
+    for detector_id, model_errors in avg_model_error_by_detector.items():
+        for model_name, error_value in model_errors.items():
+            if model_name not in model_to_errors_accum:
+                model_to_errors_accum[model_name] = []
+            model_to_errors_accum[model_name].append(error_value)
+    model_to_avg_err = {}
+    for model, errors in model_to_errors_accum.items():
+       model_to_avg_err[model] = round(np.average(errors, axis=0), 2)
+       print(f"Avg {NAMES[model]} {error_type}: {model_to_avg_err[model]}")
+    return model_to_avg_err
+    
 
 detector_lists, plot_data = make_plot_data(detector_predicts, ['offline_fl'])
 plot_and_save_two_rows(detector_lists, plot_data)
-calculate_errors_and_output_table(plot_data, "MSE")
+avg_model_error_by_detector = calculate_errors_and_output_table(plot_data, "MSE")
+calc_average_prediction_error(avg_model_error_by_detector, "MSE")
