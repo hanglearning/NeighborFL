@@ -27,7 +27,7 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 # arguments for system vars
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_detector_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
-parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting fav_neighbor_fl predictions in -lp file due to different kick strategy')
+parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
 
 parser.add_argument('-pr', '--plot_rounds', type=int, default=24, help='The number of comm rounds to plot. If starting_comm_round are not specified, plots the last these number of rounds.')
 parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='round number to start plotting')
@@ -45,8 +45,8 @@ args = args.__dict__
 
 neighbor_fl_config = args["logs_dirpath2"].split("/")[-1] if args["logs_dirpath2"] else args["logs_dirpath"].split("/")[-1]
 
-COLORS = {'stand_alone': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'fav_neighbors_fl': "red", 'true': 'blue'}
-NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'fav_neighbors_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
+COLORS = {'central': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'neighbor_fl': "red", 'true': 'blue'}
+NAMES = {'central': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'neighbor_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
 
 ''' Variables Required - Below '''
 logs_dirpath = args["logs_dirpath"]
@@ -61,10 +61,10 @@ try:
     with open(f"{args['logs_dirpath2']}/check_point/all_detector_predicts.pkl", 'rb') as f:
         fav_predicts = pickle.load(f)
         for detector in detector_predicts:
-           detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
+           detector_predicts[detector]['neighbor_fl'] = fav_predicts[detector]['neighbor_fl']
         logs_dirpath = args["logs_dirpath2"]
 except:
-    print("-lp2 for overwriting fav_neighbor_fl in -lp1 not provided or not valid")
+    print("-lp2 for overwriting neighbor_fl in -lp1 not provided or not valid")
                 
 input_length = config_vars["input_length"]
 plot_rounds = args["plot_rounds"] # to plot last plot_rounds hours

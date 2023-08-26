@@ -8,7 +8,7 @@ from tensorflow.keras.models import load_model
 class Detector:
     preserve_historical_models = 0
     logs_dirpath = None
-    def __init__(self, id, radius=None,k=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
+    def __init__(self, id, radius=None,latitude=None, longitude=None, direction=None, num_neighbors_try=1, add_heuristic=1) -> None:
         self.id = id
         self.loc = (latitude, longitude)
         self.direction = direction
@@ -16,11 +16,10 @@ class Detector:
         self._current_comm_round_X_test = None
         self._current_comm_round_y_true = None
         self.radius = radius # treat detectors within this radius as neighbors, unit miles. Default to None - consider every participating detector
-        # 3 models to report and compare
-        self.k = k # set maximum number of possible fav_neighbors. Can be used with radius
+        # self.k = k # set maximum number of possible fav_neighbors. Can be used with radius
 
         # baseline
-        self.stand_alone_model_path = None
+        self.central_model_path = None
 
         # pure FedAvg
         self.naive_fl_local_model_path = None # CCGrid
@@ -39,15 +38,15 @@ class Detector:
         self.radius_same_dir_fl_agg_model_path = None
 
         # fav_neighbor
-        self.fav_neighbors_fl_local_model_path = None
-        self.fav_neighbors_fl_agg_model_path = None # aggregated
+        self.neighbor_fl_local_model_path = None
+        self.neighbor_fl_agg_model_path = None # aggregated
 
 
-        self.fav_neighbors_fl_predictions = None
-        self.tried_fav_neighbors_fl_agg_model_path = None # aggregated
+        self.neighbor_fl_predictions = None
+        self.tried_neighbor_fl_agg_model_path = None # aggregated
 
-        self.tried_fav_neighbors_fl_predictions = None
-        self.neighbors = [] # candidate neighbors
+        self.tried_neighbor_fl_predictions = None
+        self.candidate_neighbors = []
         self.fav_neighbors = []
         self.tried_neighbors = []
         self.neighbor_to_last_accumulate = {}
@@ -58,29 +57,29 @@ class Detector:
         self.neighbor_fl_error_records = []
         self.has_added_neigbor = False # used as one of the conditions to determine whether to kick a fav neighbor
 
-    def assign_neighbors(self, list_of_detectors):
+    def assign_candidate_neighbors(self, list_of_detectors):
         for detector_id, detector in list_of_detectors.items():
             if detector == self:
                 continue
             distance = haversine(self.loc, detector.loc, unit='mi')
             if not self.radius:
                 # treat all participants as neighbors
-                self.neighbors.append((detector, distance))
+                self.candidate_neighbors.append((detector, distance))
             else:
                 if distance <= self.radius:
-                    self.neighbors.append((detector, distance))
+                    self.candidate_neighbors.append((detector, distance))
         if self.add_heuristic == 1:
             # add neighbors with close to far heuristic
-            self.neighbors = sorted(self.neighbors, key = lambda x: x[1])
+            self.candidate_neighbors = sorted(self.candidate_neighbors, key = lambda x: x[1])
         elif self.add_heuristic == 2:
             # add neighbors randomly
-            self.neighbors = random.shuffle(self.neighbors)
-        print(f"Detector {self.id} has detected {len(self.neighbors)} potential neighbors within radius {self.radius} miles.")
+            self.candidate_neighbors = random.shuffle(self.candidate_neighbors)
+        print(f"Detector {self.id} has detected {len(self.candidate_neighbors)} potential neighbors within radius {self.radius} miles.")
             
     def init_models(self, global_model_0_or_pretrained_model_path):
 
         # baseline
-        self.stand_alone_model_path = global_model_0_or_pretrained_model_path
+        self.central_model_path = global_model_0_or_pretrained_model_path
 
         # pure FedAvg
         self.naive_fl_global_model_path = global_model_0_or_pretrained_model_path
@@ -95,12 +94,12 @@ class Detector:
         self.radius_same_dir_fl_agg_model_path = global_model_0_or_pretrained_model_path
 
         # fav_neighbors
-        self.fav_neighbors_fl_agg_model_path = global_model_0_or_pretrained_model_path
+        self.neighbor_fl_agg_model_path = global_model_0_or_pretrained_model_path
         
 
     # standalone
-    def get_stand_alone_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.stand_alone_model_path}', compile = False)
+    def get_central_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.central_model_path}', compile = False)
     
     # pure FedAvg
     def get_naive_fl_local_model(self):
@@ -131,14 +130,14 @@ class Detector:
         return load_model(f'{self.logs_dirpath}/{self.radius_same_dir_fl_agg_model_path}', compile = False)
     
     # fav_neighbors
-    def get_fav_neighbors_fl_local_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_local_model_path}', compile = False)
+    def get_neighbor_fl_local_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.neighbor_fl_local_model_path}', compile = False)
     
-    def get_last_fav_neighbors_fl_agg_model(self):
-        return load_model(f'{self.logs_dirpath}/{self.fav_neighbors_fl_agg_model_path}', compile = False)
+    def get_last_neighbor_fl_agg_model(self):
+        return load_model(f'{self.logs_dirpath}/{self.neighbor_fl_agg_model_path}', compile = False)
     
-    def get_tried_fav_neighbors_fl_agg_model(self):
-        model_path = f'{self.logs_dirpath}/{self.tried_fav_neighbors_fl_agg_model_path}'
+    def get_tried_neighbor_fl_agg_model(self):
+        model_path = f'{self.logs_dirpath}/{self.tried_neighbor_fl_agg_model_path}'
         if not os.path.isfile(model_path):
             return None
         return load_model(model_path, compile = False)
@@ -176,8 +175,8 @@ class Detector:
         new_model_path = f'{model_folder_name}/{self.id}/comm_{comm_round}.h5'
         new_model.save(f'{self.logs_dirpath}/{new_model_path}')
         # baseline
-        if model_folder_name == 'stand_alone': 
-            self.stand_alone_model_path = new_model_path
+        if model_folder_name == 'central': 
+            self.central_model_path = new_model_path
 
         # pure FedAvg
         elif model_folder_name == 'naive_fl_local': 
@@ -202,12 +201,12 @@ class Detector:
             self.radius_same_dir_fl_agg_model_path = new_model_path
 
         # fav_neighbors
-        elif model_folder_name == 'fav_neighbors_fl_local': 
-            self.fav_neighbors_fl_local_model_path = new_model_path
-        elif model_folder_name == 'fav_neighbors_fl_agg': 
-            self.fav_neighbors_fl_agg_model_path = new_model_path
-        elif model_folder_name == 'tried_fav_neighbors_fl_agg': 
-            self.tried_fav_neighbors_fl_agg_model_path = new_model_path
+        elif model_folder_name == 'neighbor_fl_local': 
+            self.neighbor_fl_local_model_path = new_model_path
+        elif model_folder_name == 'neighbor_fl_agg': 
+            self.neighbor_fl_agg_model_path = new_model_path
+        elif model_folder_name == 'tried_neighbor_fl_agg': 
+            self.tried_neighbor_fl_agg_model_path = new_model_path
         self.delete_historical_models(f'{self.logs_dirpath}/{model_folder_name}/{self.id}', comm_round)
     
     @classmethod

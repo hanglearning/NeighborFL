@@ -27,7 +27,7 @@ from tabulate import tabulate
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="inferencing code")
 
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
-parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting fav_neighbor_fl predictions in -lp file due to different kick strategy')
+parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
 parser.add_argument('-et', '--error_type', type=str, default="MSE", help='error type to calculate, namely MAE, MSE, MAPE, RMSE.')
 parser.add_argument('-ei', '--error_interval', type=int, default=24, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in the plot')
@@ -42,8 +42,8 @@ args = args.__dict__
 # plot legends
 neighbor_fl_config = args["logs_dirpath2"].split("/")[-1] if args["logs_dirpath2"] else args["logs_dirpath"].split("/")[-1]
 
-COLORS = {'stand_alone': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'fav_neighbors_fl': "red", 'true': 'blue'}
-NAMES = {'stand_alone': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'fav_neighbors_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
+COLORS = {'central': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'neighbor_fl': "red", 'true': 'blue'}
+NAMES = {'central': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'neighbor_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
 
 
 ''' load vars '''
@@ -58,10 +58,10 @@ try:
     with open(f"{args['logs_dirpath2']}/check_point/all_detector_predicts.pkl", 'rb') as f:
         fav_predicts = pickle.load(f)
         for detector in detector_predicts:
-           detector_predicts[detector]['fav_neighbors_fl'] = fav_predicts[detector]['fav_neighbors_fl']
+           detector_predicts[detector]['neighbor_fl'] = fav_predicts[detector]['neighbor_fl']
         logs_dirpath = args["logs_dirpath2"]
 except:
-    print("-lp2 for overwriting fav_neighbor_fl in -lp1 not provided or not valid")
+    print("-lp2 for overwriting neighbor_fl in -lp1 not provided or not valid")
 
 all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
     
@@ -111,7 +111,7 @@ def construct_realtime_error_table(realtime_predicts):
                 true_data_list = []
                 first_round_skip = True
                 # deal with xticklabels
-                if model == 'fav_neighbors_fl':
+                if model == 'neighbor_fl':
                     # only need one iteration to form this list (by specifying one model)
                     xticklabels[-1].append(round)
                     xticklabels.append([round + 1])
@@ -178,7 +178,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
         for model_name in model_err_normalized:
             ax.plot(range(num_of_plot_points), model_err_normalized[model_name], label=model_name, color=COLORS[model_name])
 
-            # compare this model vs. to_compare_model (e.g. fav_neighbors_fl) and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put to_compare_model as the first argument to compare_l1_smaller_equal_percent.
+            # compare this model vs. to_compare_model (e.g. neighbor_fl) and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put to_compare_model as the first argument to compare_l1_smaller_equal_percent.
 
             if model_name != to_compare_model:
                 to_compare_better_percent_val, to_compare_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model], model_err_normalized[model_name])
@@ -258,7 +258,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
         for model_name in model_err_normalized:
             subplot.plot(range(num_of_plot_points), model_err_normalized[model_name], label=model_name, color=COLORS[model_name])
 
-            # compare this model vs. to_compare_model (e.g. fav_neighbors_fl) and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put to_compare_model as the first argument to compare_l1_smaller_equal_percent.
+            # compare this model vs. to_compare_model (e.g. neighbor_fl) and show smaller-error-value percentage, normalized. Smaller is better since we compare error, and we put to_compare_model as the first argument to compare_l1_smaller_equal_percent.
 
             if model_name != to_compare_model:
                 to_compare_better_percent_val, to_compare_better_percent_string = compare_l1_smaller_equal_percent(model_err_normalized[to_compare_model], model_err_normalized[model_name])
@@ -320,10 +320,10 @@ def calc_average_prediction_error(realtime_error_table):
 realtime_error_table, xticklabels = construct_realtime_error_table(detector_predicts)
 
 # show plots
-to_compare_model = 'fav_neighbors_fl'
+to_compare_model = 'neighbor_fl'
 print(f"Plotting {args['error_type']}...")
 plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabels, 11, 10, 0.2)
 
-models_in_df = ["fav_neighbors_fl", "naive_fl", "stand_alone", "radius_naive_fl"] # index 0 model to compare
+models_in_df = ["neighbor_fl", "naive_fl", "central", "radius_naive_fl"] # index 0 model to compare
 save_error_df(realtime_error_table, xticklabels, models_in_df)
 # calc_average_prediction_error(realtime_error_table)
