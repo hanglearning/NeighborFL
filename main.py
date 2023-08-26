@@ -280,11 +280,11 @@ else:
     run_comm_rounds = max_comm_rounds
 
 print(f"Starting Federated Learning with total comm rounds {run_comm_rounds}...")
-end_train_index = config_vars["start_train_index"] + config_vars["tau1"] + (run_comm_rounds - 1) * config_vars["tau2p"]
+end_data_index = config_vars["start_train_index"] + config_vars["tau1"] + (run_comm_rounds - 1) * config_vars["tau2p"]
 
 print(f"Start training Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[config_vars['start_train_index']]['Timestamp']}")
 print(f"Start prediction Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[config_vars['start_train_index'] + INPUT_LENGTH]['Timestamp']}")
-print(f"End Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_train_index - 1]['Timestamp']}")
+print(f"End Timestamp (inclusive): {whole_data_record[list(whole_data_record.keys())[0]].iloc[end_data_index - 1]['Timestamp']}")
 
 methods_count = str(config_vars['learning_methods']).count('1')
 
@@ -295,7 +295,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     
     ''' calculate simulation data range (collect and update dataset) '''
 
-    end_collected_data_index = training_start_index + config_vars['tau1'] + (comm_round - 1) * new_sample_size_per_comm_round - 1
+    end_collected_data_index = config_vars['start_train_index'] + config_vars['tau1'] + (comm_round - 1) * new_sample_size_per_comm_round - 1
     
     # train data
     training_start_index = end_collected_data_index - config_vars["max_data_size"] + 1
