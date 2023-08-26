@@ -17,9 +17,7 @@ from create_model import create_gru
 from model_training import train_model
 
 from process_data import get_scaler
-from process_data import process_train_data
-from process_data import process_test_one_step
-from process_data import process_test_multi_and_get_y_true
+from process_data import process_data
 
 from copy import deepcopy
 
@@ -36,7 +34,8 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
-parser.add_argument('-il', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
+parser.add_argument('-I', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
+parser.add_argument('-O', '--output_length', type=int, default=1, help='output length for the LSTM/GRU network')
 parser.add_argument('-hn', '--hidden_neurons', type=int, default=128, help='number of neurons in one of each 2 layers')
 parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss evaluation while training')
 parser.add_argument('-op', '--optimizer', type=str, default="rmsprop", help='optimizer for training')
@@ -107,7 +106,7 @@ print(f"Pretraining starts with {start_timestamp} and end with {end_timestamp} (
 for sensor_id, data in whole_data_record.items():
     ''' Process traning data '''
     # process training data
-    X_train, y_train = process_train_data(data, scaler, args['input_length'])
+    X_train, y_train = process_data(data, scaler, args['input_length'], args['output_length'])
 
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
