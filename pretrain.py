@@ -30,7 +30,7 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # arguments for system vars
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="KFRT pretrain")
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
 parser.add_argument('-I', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
@@ -44,7 +44,7 @@ parser.add_argument('-e', '--epochs', type=int, default=5, help='pretrain epoch 
 parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.0, help='percentage of the data for pretraining')
 parser.add_argument('-si', '--pretrain_start_index', type=int, default=0, help='the starting row for the pretrained models')
 parser.add_argument('-ei', '--pretrain_end_index', type=int, default=0, help='till which row in df we do pretrain. if this is provide, overwrite -pp')
-parser.add_argument('-sp', '--model_save_path', type=str, default="/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/pretrained_models", help='the path to save the pretrained models')
+parser.add_argument('-sp', '--model_save_path', type=str, default="/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/pretrained_models", help='the path to save the pretrained models')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -110,6 +110,6 @@ for sensor_id, data in whole_data_record.items():
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
     new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
-    new_model.save(f"{args['model_save_path']}/{sensor_id}.h5")
+    new_model.save(f"{args['model_save_path']}_I_{args['input_length']}_O_{args['output_length']}/{sensor_id}.h5")
 
 print(f"Pretrain done till line {min_read_line_num} for each device.")
