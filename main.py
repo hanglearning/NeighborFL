@@ -295,7 +295,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     
     ''' calculate simulation data range (collect and update dataset) '''
 
-    end_collected_data_index = config_vars['tau1'] + (comm_round - 1) * new_sample_size_per_comm_round - 1
+    end_collected_data_index = training_start_index + config_vars['tau1'] + (comm_round - 1) * new_sample_size_per_comm_round - 1
     
     # train data
     training_start_index = end_collected_data_index - config_vars["max_data_size"] + 1
