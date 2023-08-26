@@ -1,5 +1,4 @@
 # code for individual pre-training
-from Device import Detector
 
 import os
 from os import listdir
@@ -44,7 +43,7 @@ parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for
 parser.add_argument('-e', '--epochs', type=int, default=5, help='pretrain epoch number')
 parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.0, help='percentage of the data for pretraining')
 parser.add_argument('-si', '--pretrain_start_index', type=int, default=0, help='the starting row for the pretrained models')
-parser.add_argument('-ei', '--pretrain_end_index', type=int, default=0, help='till which row in df we do pretrain.if this is provide, overwrite -pp')
+parser.add_argument('-ei', '--pretrain_end_index', type=int, default=0, help='till which row in df we do pretrain. if this is provide, overwrite -pp')
 parser.add_argument('-sp', '--model_save_path', type=str, default="/content/drive/MyDrive/Hang_PeMS/PeMS-Bay 061223/PeMS-Bay Selected/pretrained_models", help='the path to save the pretrained models')
 
 args = parser.parse_args()
@@ -58,9 +57,9 @@ def reset_random_seeds():
 
 reset_random_seeds()
 
-# read in detector file paths
-all_detector_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
-print(f'We have {len(all_detector_files)} detectors available.')
+# read in device file paths
+all_device_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
+print(f'We have {len(all_device_files)} devices available.')
 
 # init first model
 
@@ -69,11 +68,11 @@ model_units = [args['input_length'], args['hidden_neurons'], args['hidden_neuron
 model_configs = [args['loss'], args['optimizer'], args['metrics']]
 global_model_0 = create_model(model_units, model_configs)
 
-''' load data for each detector '''
+''' load data for each device '''
 min_read_line_num = float('inf')
-for detector_file_iter in range(len(all_detector_files)):
-    detector_file_name = all_detector_files[detector_file_iter]
-    file_path = os.path.join(args['dataset_path'], detector_file_name)
+for device_file_iter in range(len(all_device_files)):
+    device_file_name = all_device_files[device_file_iter]
+    file_path = os.path.join(args['dataset_path'], device_file_name)
     
     # count lines to later determine max comm rounds
     whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
@@ -83,16 +82,16 @@ for detector_file_iter in range(len(all_detector_files)):
     min_read_line_num = min(min_read_line_num, read_to_line)
 
 whole_data_record = {} # to calculate scaler
-for detector_file_iter in range(len(all_detector_files)):
-    detector_file_name = all_detector_files[detector_file_iter]
-    sensor_id = detector_file_name.split('-')[-1].strip().split(".")[0]
+for device_file_iter in range(len(all_device_files)):
+    device_file_name = all_device_files[device_file_iter]
+    sensor_id = device_file_name.split('-')[-1].strip().split(".")[0]
     # data file path
-    file_path = os.path.join(args['dataset_path'], detector_file_name)
+    file_path = os.path.join(args['dataset_path'], device_file_name)
     
     # count lines to later determine max comm rounds
     whole_data = pd.read_csv(file_path, encoding='utf-8').fillna(0)
     whole_data = whole_data[:min_read_line_num]
-    print(f'Loaded {min_read_line_num} lines of data from {detector_file_name}. Last training timestamp {whole_data.iloc[min_read_line_num - 1]["Timestamp"]}. ({detector_file_iter+1}/{len(all_detector_files)})')
+    print(f'Loaded {min_read_line_num} lines of data from {device_file_name}. Last training timestamp {whole_data.iloc[min_read_line_num - 1]["Timestamp"]}. ({device_file_iter+1}/{len(all_device_files)})')
     whole_data_record[sensor_id] = whole_data
 
     ''' get scaler '''
@@ -113,4 +112,4 @@ for sensor_id, data in whole_data_record.items():
     new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
     new_model.save(f"{args['model_save_path']}/{sensor_id}.h5")
 
-print(f"Pretrain done till line {min_read_line_num} for each detector.")
+print(f"Pretrain done till line {min_read_line_num} for each device.")
