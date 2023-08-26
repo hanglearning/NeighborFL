@@ -34,7 +34,7 @@ parser.add_argument('-row', '--row', type=int, default=1, help='number of rows i
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-sr', '--start_round', type=int, default=1, help='provide the starting communication round, by default the 1st round of the simulation')
 parser.add_argument('-er', '--end_round', type=int, default=None, help='provide the ending communication round, by default the last round of the simulation')
-parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. If not speified, no single figure will be generated')
+parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no single figure will be generated')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -50,27 +50,27 @@ NAMES = {'central': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-Naiv
 logs_dirpath = args['logs_dirpath']
 with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
     config_vars = pickle.load(f)
-# all_detector_files = config_vars["all_detector_files"]
-with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
-    detector_predicts = pickle.load(f)
+# all_device_files = config_vars["all_device_files"]
+with open(f"{logs_dirpath}/check_point/all_device_predicts.pkl", 'rb') as f:
+    device_predicts = pickle.load(f)
 
 try:
-    with open(f"{args['logs_dirpath2']}/check_point/all_detector_predicts.pkl", 'rb') as f:
+    with open(f"{args['logs_dirpath2']}/check_point/all_device_predicts.pkl", 'rb') as f:
         fav_predicts = pickle.load(f)
-        for detector in detector_predicts:
-           detector_predicts[detector]['neighbor_fl'] = fav_predicts[detector]['neighbor_fl']
+        for device in device_predicts:
+           device_predicts[device]['neighbor_fl'] = fav_predicts[device]['neighbor_fl']
         logs_dirpath = args["logs_dirpath2"]
 except:
     print("-lp2 for overwriting neighbor_fl in -lp1 not provided or not valid")
 
-all_detector_files = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
+all_device_files = [device_file.split('.')[0] for device_file in device_predicts.keys()]
     
 ROW = args["row"]
 COL = args["column"]
 if ROW != 1 and COL is None:
-    COL = math.ceil(len(detector_predicts) / ROW)
+    COL = math.ceil(len(device_predicts) / ROW)
     if args["representative"]:
-        COL = math.ceil((len(detector_predicts) - 1) / ROW)
+        COL = math.ceil((len(device_predicts) - 1) / ROW)
 
 ''' load vars '''
 start_round = args["start_round"]
@@ -151,7 +151,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
 
     error_to_plot = args["error_type"]
 
-    sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_detector_files]
+    sensor_lists = [sensor_file.split('.')[0] for sensor_file in all_device_files]
 
     # draw single rep plot
     rep_sensor_id = args['representative']
@@ -288,11 +288,11 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
 
 def save_error_df(realtime_error_table, xticklabels, models_in_df):
     error_df = pd.DataFrame(columns=["ID", "Model"] + [f'R{r[0]}-R{r[-1]}' for r in xticklabels] + ["Surpass Percentage"])
-    for detector_id, model_errors in realtime_error_table.items():
+    for device_id, model_errors in realtime_error_table.items():
         for model_name, error_values in model_errors.items():
             if model_name in models_in_df:
                 to_compare_better_percent_val, _ = compare_l1_smaller_equal_percent(model_errors[models_in_df[0]], model_errors[model_name])
-                new_row = [detector_id, NAMES[model_name]] + error_values
+                new_row = [device_id, NAMES[model_name]] + error_values
                 if model_name != models_in_df[0]:
                     new_row += [f"{to_compare_better_percent_val:.2%}"]
                 else:
@@ -305,7 +305,7 @@ def save_error_df(realtime_error_table, xticklabels, models_in_df):
 
 def calc_average_prediction_error(realtime_error_table):
     model_to_errors_accum = {}
-    for detector_id, model_errors in realtime_error_table.items():
+    for device_id, model_errors in realtime_error_table.items():
         for model_name, error_values in model_errors.items():
             if model_name not in model_to_errors_accum:
                 model_to_errors_accum[model_name] = []
@@ -317,7 +317,7 @@ def calc_average_prediction_error(realtime_error_table):
        print(f"Avg {NAMES[model]} {args['error_type']}: {model_to_avg_err[model]}")
     return model_to_avg_err
     
-realtime_error_table, xticklabels = construct_realtime_error_table(detector_predicts)
+realtime_error_table, xticklabels = construct_realtime_error_table(device_predicts)
 
 # show plots
 to_compare_model = 'neighbor_fl'

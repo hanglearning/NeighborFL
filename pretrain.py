@@ -1,5 +1,5 @@
 # code for individual pre-training
-from Detector import Detector
+from Device import Detector
 
 import os
 from os import listdir

@@ -1,14 +1,10 @@
 import numpy as np
 
-""" Functions to process the data before training, including constructing the training and test data with scaling
+""" Functions to process the data for training and predicting
 
-NOTE - set the `attr` value for the learning and predicting feature (consistent in both functions)
+NOTE - set the `attr` value for the learning and predicting feature 
 """
 
-# Prepare Data Preprocessing function
-"""
-Processing the data
-"""
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 attr = 'Speed'
@@ -17,38 +13,17 @@ def get_scaler(df_whole):
     scaler = MinMaxScaler(feature_range=(0, 1)).fit(df_whole[attr].values.reshape(-1, 1))
     return scaler
 
-def process_train_data(df_train, scaler, INPUT_LENGTH):
-    flow_train = scaler.transform(df_train[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
-    train_set = []
-    for i in range(INPUT_LENGTH, len(flow_train)):
-        train_set.append(flow_train[i - INPUT_LENGTH: i + 1])
-    train = np.array(train_set)
-    X_train = train[:, :-1]
-    y_train = train[:, -1]
-
-    return X_train, y_train
-
-def process_test_one_step(df_test, scaler, INPUT_LENGTH):
-    flow_test = scaler.transform(df_test[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
-    test_set = []
-    for i in range(INPUT_LENGTH, len(flow_test)):
-        test_set.append(flow_test[i - INPUT_LENGTH: i + 1])
-    test = np.array(test_set) 
-    X_test = test[:, :-1]
-    y_test = test[:, -1]
-    return X_test, y_test
-
-def process_test_multi_and_get_y_true(df_test, scaler, INPUT_LENGTH, num_last_layer_neurons):
+def process_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH):
     
-    flow_test = scaler.transform(df_test[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
-    test_set = []
+    flow_data = scaler.transform(df_data[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
+    data_set = []
     
-    for i in range(INPUT_LENGTH, len(flow_test) - (num_last_layer_neurons - 1)):
-        test_set.append(flow_test[i - INPUT_LENGTH: i + num_last_layer_neurons])
-    test = np.array(test_set) 
+    for i in range(INPUT_LENGTH, len(flow_data) - (OUTPUT_LENGTH - 1)):
+        data_set.append(flow_data[i - INPUT_LENGTH: i + OUTPUT_LENGTH])
+    data = np.array(data_set) 
     
-    X_test = test[:, :-num_last_layer_neurons]
-    y_true = test[:, -num_last_layer_neurons:]
+    X = data[:, :-OUTPUT_LENGTH]
+    y = data[:, -OUTPUT_LENGTH:]
 
-    return X_test, y_true 
+    return X, y 
 

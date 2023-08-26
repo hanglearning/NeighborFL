@@ -26,16 +26,16 @@ from error_calc import get_MAPE
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg plot learning curves")
 
 # arguments for system vars
-parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_detector_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
+parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_device_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
 parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
 
 parser.add_argument('-pr', '--plot_rounds', type=int, default=24, help='The number of comm rounds to plot. If starting_comm_round are not specified, plots the last these number of rounds.')
 parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='round number to start plotting')
 # parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='round number to end plotting, inclusive')
 parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, default to 5 mins')
-parser.add_argument('-nsx', '--num_sing_xticks', type=int, default=12, help='how many x-axes (xticks) on single detector plot, usually should set to same as plot_rounds')
-parser.add_argument('-nmx', '--num_mul_xticks', type=int, default=4, help='how many x-axes (xticks) on multiple detectors plot')
-parser.add_argument('-r', '--representative', type=str, default=None, help='detector id to be the representative figure. If not speified, no single figure will be generated')
+parser.add_argument('-nsx', '--num_sing_xticks', type=int, default=12, help='how many x-axes (xticks) on single device plot, usually should set to same as plot_rounds')
+parser.add_argument('-nmx', '--num_mul_xticks', type=int, default=4, help='how many x-axes (xticks) on multiple devices plot')
+parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no single figure will be generated')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
 parser.add_argument('-attr', '--attribute', type=str, default='Speed', help='prediciting feature')
@@ -53,15 +53,15 @@ logs_dirpath = args["logs_dirpath"]
 with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
 		config_vars = pickle.load(f)
                 
-with open(f"{logs_dirpath}/check_point/all_detector_predicts.pkl", 'rb') as f:
-    detector_predicts = pickle.load(f)
+with open(f"{logs_dirpath}/check_point/all_device_predicts.pkl", 'rb') as f:
+    device_predicts = pickle.load(f)
 
 
 try:
-    with open(f"{args['logs_dirpath2']}/check_point/all_detector_predicts.pkl", 'rb') as f:
+    with open(f"{args['logs_dirpath2']}/check_point/all_device_predicts.pkl", 'rb') as f:
         fav_predicts = pickle.load(f)
-        for detector in detector_predicts:
-           detector_predicts[detector]['neighbor_fl'] = fav_predicts[detector]['neighbor_fl']
+        for device in device_predicts:
+           device_predicts[device]['neighbor_fl'] = fav_predicts[device]['neighbor_fl']
         logs_dirpath = args["logs_dirpath2"]
 except:
     print("-lp2 for overwriting neighbor_fl in -lp1 not provided or not valid")
@@ -72,7 +72,7 @@ time_res = args["time_resolution"]
 num_sing_xticks = args["num_sing_xticks"]
 num_mul_xticks = args["num_mul_xticks"]
 
-last_comm_round = detector_predicts[list(detector_predicts.keys())[0]]['true'][-1][0]
+last_comm_round = device_predicts[list(device_predicts.keys())[0]]['true'][-1][0]
 if not args["starting_comm_round"]:
     s_round = last_comm_round - plot_rounds + 1
     e_round = last_comm_round
@@ -83,22 +83,22 @@ else:
 ROW = args["row"]
 COL = args["column"]
 if ROW != 1 and COL is None:
-    COL = math.ceil(len(detector_predicts) / ROW)
+    COL = math.ceil(len(device_predicts) / ROW)
     if args["representative"]:
-        COL = math.ceil((len(detector_predicts) - 1) / ROW)
+        COL = math.ceil((len(device_predicts) - 1) / ROW)
 
 ''' Variables Required - Above'''
 
-plot_dir_path = f'{logs_dirpath}/plots/realtime_learning_curves_all_detectors'
+plot_dir_path = f'{logs_dirpath}/plots/realtime_learning_curves_all_devices'
 os.makedirs(plot_dir_path, exist_ok=True)
 
-def make_plot_data(detector_predicts, skip_models):
-    detector_lists = [detector_file.split('.')[0] for detector_file in detector_predicts.keys()]
+def make_plot_data(device_predicts, skip_models):
+    device_lists = [device_file.split('.')[0] for device_file in device_predicts.keys()]
     
     plot_data = {}
-    for detector_file, models_attr in detector_predicts.items():
-      detector_id = detector_file.split('.')[0]
-      plot_data[detector_id] = {}
+    for device_file, models_attr in device_predicts.items():
+      device_id = device_file.split('.')[0]
+      plot_data[device_id] = {}
 
       for model, predicts in models_attr.items():
 
@@ -106,16 +106,16 @@ def make_plot_data(detector_predicts, skip_models):
         if model in skip_models or not predicts:
             continue
 
-        plot_data[detector_id][model] = []
+        plot_data[device_id][model] = []
         
         for predict in predicts:
             round = predict[0]
             if round in range(s_round, e_round + 1):
-                plot_data[detector_id][model].extend(predict[1])
+                plot_data[device_id][model].extend(predict[1])
 
-    return detector_lists, plot_data
+    return device_lists, plot_data
   
-def plot_and_save_two_rows(detector_lists, plot_data):
+def plot_and_save_two_rows(device_lists, plot_data):
     global COL # Not sure why have to do this here, and not for ROW
     """Plot
     Plot the true data and predicted data.
@@ -157,8 +157,8 @@ def plot_and_save_two_rows(detector_lists, plot_data):
 
     # draw subplots
     if ROW == 1 and COL is None:
-        # COL = len(detector_lists) - 1
-        COL = len(detector_lists)
+        # COL = len(device_lists) - 1
+        COL = len(device_lists)
     fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
     plt.setp(axs, ylim=(0, 75))
     # axs[0].set_ylabel(args['attribute'])
@@ -177,23 +177,23 @@ def plot_and_save_two_rows(detector_lists, plot_data):
     my_xticklabels = [s_round, math.ceil((s_round + e_round)/2), e_round]
     
     if rep_sensor_id:
-        detector_lists.remove(rep_sensor_id)
+        device_lists.remove(rep_sensor_id)
 
-    for detector_plot_iter in range(len(detector_lists)):
-        row = detector_plot_iter // COL
-        col = detector_plot_iter % COL
+    for device_plot_iter in range(len(device_lists)):
+        row = device_plot_iter // COL
+        col = device_plot_iter % COL
 
         if ROW == 1 and COL == 1:
           subplots = axs
         elif ROW == 1 and COL > 1:
-          subplots = axs[detector_plot_iter]
+          subplots = axs[device_plot_iter]
         elif ROW > 1 and COL > 1:
           subplots = axs[row][col]
         
-        detector_id = detector_lists[detector_plot_iter]
+        device_id = device_lists[device_plot_iter]
         # subplots.set_xlabel('Comm Round')
-        # subplots.set_title(detector_id, fontsize=30)
-        subplots.set_title(detector_id)
+        # subplots.set_title(device_id, fontsize=30)
+        subplots.set_title(device_id)
         
         
         subplots.set_xticks(my_xticks)
@@ -201,9 +201,9 @@ def plot_and_save_two_rows(detector_lists, plot_data):
 
         # plot data
         legend_handles = []
-        for model in plot_data[detector_id]:
-            if plot_data[detector_id][model]:
-                to_plot = plot_data[detector_id][model]
+        for model in plot_data[device_id]:
+            if plot_data[device_id][model]:
+                to_plot = plot_data[device_id][model]
                 subplots.plot(range(len(to_plot)), to_plot, label=NAMES[model], color=COLORS[model])
                 legend_handles.append(mlines.Line2D([], [], color=COLORS[model], label=NAMES[model]))
         
@@ -216,18 +216,18 @@ def plot_and_save_two_rows(detector_lists, plot_data):
 
 def calculate_errors_and_output_table(plot_data, err_type):
     # plotting_range = int(60/time_res*plot_rounds)
-    detetor_id_to_model_errors = {}
-    for detector_id, prediction_method in plot_data.items():
+    device_id_to_model_errors = {}
+    for device_id, prediction_method in plot_data.items():
         model_to_error = {}
         for model, predicts in prediction_method.items():
             if model != 'true' and predicts:
                 model_to_error[model] = globals()[f'get_{err_type}'](prediction_method['true'], predicts)
-        detetor_id_to_model_errors[detector_id] = model_to_error
+        device_id_to_model_errors[device_id] = model_to_error
     
-    avg_model_error_by_detector = detetor_id_to_model_errors
+    avg_model_error_by_device = device_id_to_model_errors
     
-    columns = list(detetor_id_to_model_errors[detector_id].keys())
-    err_df = pd.DataFrame([detetor_id_to_model_errors[detector_id] for detector_id in plot_data], columns=columns, index=list(detetor_id_to_model_errors.keys()))
+    columns = list(device_id_to_model_errors[device_id].keys())
+    err_df = pd.DataFrame([device_id_to_model_errors[device_id] for device_id in plot_data], columns=columns, index=list(device_id_to_model_errors.keys()))
     err_df.rename(columns={old:new for old, new in zip(columns, [NAMES[n] for n in columns])}, inplace=True)
 
     # ChatGPT generated
@@ -252,11 +252,11 @@ def calculate_errors_and_output_table(plot_data, err_type):
 
     # err_df.to_csv(f'{plot_dir_path}/{err_type}_errors_rounds_{s_round}_{e_round}.csv')
 
-    return avg_model_error_by_detector
+    return avg_model_error_by_device
 
-def calc_average_prediction_error(avg_model_error_by_detector, error_type):
+def calc_average_prediction_error(avg_model_error_by_device, error_type):
     model_to_errors_accum = {}
-    for detector_id, model_errors in avg_model_error_by_detector.items():
+    for device_id, model_errors in avg_model_error_by_device.items():
         for model_name, error_value in model_errors.items():
             if model_name not in model_to_errors_accum:
                 model_to_errors_accum[model_name] = []
@@ -268,7 +268,7 @@ def calc_average_prediction_error(avg_model_error_by_detector, error_type):
     return model_to_avg_err
     
 
-detector_lists, plot_data = make_plot_data(detector_predicts, ['offline_fl'])
-plot_and_save_two_rows(detector_lists, plot_data)
-avg_model_error_by_detector = calculate_errors_and_output_table(plot_data, "MSE")
-calc_average_prediction_error(avg_model_error_by_detector, "MSE")
+device_lists, plot_data = make_plot_data(device_predicts, ['offline_fl'])
+plot_and_save_two_rows(device_lists, plot_data)
+avg_model_error_by_device = calculate_errors_and_output_table(plot_data, "MSE")
+calc_average_prediction_error(avg_model_error_by_device, "MSE")
