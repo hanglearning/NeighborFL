@@ -155,7 +155,7 @@ else:
 
     # create log folder indicating by current running date and time
     date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
-    logs_dirpath = f"{config_vars['logs_base_folder']}/{date_time}_{config_vars['model']}_input_{config_vars['input_length']}_mds_{config_vars['max_data_size']}_epoch_{config_vars['epochs']}_ks_{config_vars['kick_strategy']}_lm_{config_vars['learning_methods']}"
+    logs_dirpath = f"{config_vars['logs_base_folder']}/{date_time}_{config_vars['model']}_mds_{config_vars['max_data_size']}_epoch_{config_vars['epochs']}_ks_{config_vars['kick_strategy']}_I_{config_vars['input_length']}_O_{config_vars['output_length']}_lm_{config_vars['learning_methods']}"
     os.makedirs(f"{logs_dirpath}/check_point", exist_ok=True)
     Device.logs_dirpath = logs_dirpath
     
@@ -489,16 +489,11 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                     if_kick = True
             # kick
             if if_kick:
-                kick_nums = []
-                if config_vars["kick_percent"]:
-                    kick_nums.append(round(len(device.fav_neighbors) * config_vars["kick_percent"]))
-                if config_vars["kick_num"]:
-                    kick_nums.append(config_vars["kick_num"])
-                kick_num = random.choice(kick_nums)
+                kick_num = config_vars["kick_num"]
                 rep_tuples = [(id, rep) for id, rep in sorted(device.neighbors_to_rep_score.items(), key=lambda x: x[1])]
                 if config_vars["kick_strategy"] == 1:
                     # kick by lowest reputation
-                    # pass # 3/12/23, since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
+                    # May need improve - since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
                     for i in range(len(rep_tuples)):
                         if kick_num > 0:
                             to_kick_id = rep_tuples[i][0]
