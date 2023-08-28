@@ -17,7 +17,8 @@ from create_model import create_gru
 from model_training import train_model
 
 from process_data import get_scaler
-from process_data import process_data
+from process_data import process_train_data
+from process_data import process_test_data
 
 from error_calc import get_MAE
 from error_calc import get_MSE
@@ -301,7 +302,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     training_start_index = end_collected_data_index - config_vars["max_data_size"] + 1
     training_start_index = config_vars["start_train_index"] if training_start_index < config_vars["start_train_index"] else training_start_index
     # test data
-    test_data_starting_index = config_vars["start_train_index"] if comm_round == 1 else end_collected_data_index - new_sample_size_per_comm_round - INPUT_LENGTH + 1
+    test_data_start_index = config_vars["start_train_index"] if comm_round == 1 else end_collected_data_index - new_sample_size_per_comm_round - INPUT_LENGTH - (OUTPUT_LENGTH - 1) + 1
 
     predict_end_indexes = [ind for ind in range(end_collected_data_index, end_collected_data_index + OUTPUT_LENGTH)]
     if comm_round == 1:
@@ -324,12 +325,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # slice training data
         train_data = whole_data_record[sensor_id][training_start_index: end_collected_data_index + 1]
         # process training data
-        X_train, y_train = process_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH)
+        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH)
         ''' Process test data '''
         # slice test data
-        test_data = whole_data_record[sensor_id][test_data_starting_index: end_collected_data_index + 1]
+        test_data = whole_data_record[sensor_id][test_data_start_index: end_collected_data_index + 1]
         # process test data
-        X_test, y_true = process_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH)
+        X_test, y_true = process_test_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round)
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))

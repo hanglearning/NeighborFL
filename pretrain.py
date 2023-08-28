@@ -16,7 +16,7 @@ from create_model import create_gru
 from model_training import train_model
 
 from process_data import get_scaler
-from process_data import process_data
+from process_data import process_train_data
 
 from copy import deepcopy
 
@@ -105,7 +105,7 @@ print(f"Pretraining starts with {start_timestamp} and end with {end_timestamp} (
 for sensor_id, data in whole_data_record.items():
     ''' Process traning data '''
     # process training data
-    X_train, y_train = process_data(data, scaler, args['input_length'], args['output_length'])
+    X_train, y_train = process_train_data(data, scaler, args['input_length'], args['output_length'])
 
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
