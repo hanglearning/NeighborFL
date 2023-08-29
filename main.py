@@ -210,8 +210,12 @@ else:
         if config_vars['pretrained_models_path']:
             pretrained_models_folder = f'{Device.logs_dirpath}/pretrained_models'
             os.makedirs(pretrained_models_folder, exist_ok=True)
-            shutil.copy(f"{config_vars['pretrained_models_path']}/{sensor_id}.h5", pretrained_models_folder)
-            device.init_models(f"pretrained_models/{sensor_id}.h5")
+            if not os.path.exists(f"{config_vars['pretrained_models_path']}/{sensor_id}.h5"):
+                print(f"WARNING - Pretrained model file for {sensor_id} NOT exists in the specified path. Init to the randomly initialized model.")
+                device.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
+            else:
+                shutil.copy(f"{config_vars['pretrained_models_path']}/{sensor_id}.h5", pretrained_models_folder)
+                device.init_models(f"pretrained_models/{sensor_id}.h5")
         else:
             device.init_models(f"{naive_fl_global_model_path}/comm_0.h5")
 
@@ -370,8 +374,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             # neighbor_fl local model
             device.has_added_neigbor = False
             chosen_model = device.get_last_neighbor_fl_agg_model() # by default
-
-            error_without_new_neighbors = get_error(y_true, device_predicts[sensor_id]['neighbor_fl'][-1][1])  # also works when not selected candidates in last round
+            
+            # for O > 1, special dealing with y_true and predicts
+            predicts = device_predicts[sensor_id]['neighbor_fl'][-1][1][:-(OUTPUT_LENGTH - 1)] # drop latest
+            if comm_round > 1:
+                y_true = y_true[OUTPUT_LENGTH - 1:] # drop earlist
+            error_without_new_neighbors = get_error(y_true, predicts)  # also works when not selected candidates in last round
             
             neighbor_fl_error = error_without_new_neighbors
             device.neighbor_fl_error_records.append(neighbor_fl_error)
@@ -385,7 +393,9 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
                 eval_neighbor_fl_agg_model_predictions = eval_neighbor_fl_agg_model.predict(X_test)
                 eval_neighbor_fl_agg_model_predictions = scaler.inverse_transform(eval_neighbor_fl_agg_model_predictions)
                 
-                error_with_new_neighbors = get_error(y_true, eval_neighbor_fl_agg_model_predictions)
+                # drop latest
+                eval_predicts = eval_neighbor_fl_agg_model_predictions[:-(OUTPUT_LENGTH - 1)]
+                error_with_new_neighbors = get_error(y_true, eval_predicts)
                 error_diff = error_without_new_neighbors - error_with_new_neighbors
                 if error_diff > 0:
                     # candidate neighbor(s) are good
