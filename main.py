@@ -85,6 +85,8 @@ parser.add_argument('-lm', '--learning_methods', type=str, default=1111, help='1
 args = parser.parse_args()
 args = args.__dict__
 
+command_line_args = parser.parse_known_args()
+
 # https://stackoverflow.com/questions/60058588/tesnorflow-2-0-tf-random-set-seed-not-working-since-i-am-getting-different-resul
 def reset_random_seeds():
    os.environ['PYTHONHASHSEED']=str(args["seed"])
@@ -124,13 +126,13 @@ if args['resume_path']:
         config_vars['resume_path'] = logs_dirpath
         # confirm overwritten args
         diff_args = {}
-        for arg in args:
-            if args[arg] != config_vars[arg]:
-                diff_args[arg] = args[arg]
+        for arg in command_line_args:
+            if command_line_args[arg] != config_vars[arg]:
+                diff_args[arg] = command_line_args[arg]
         if diff_args:
             print("Please confirm the following args to overwrite:")
             for arg in diff_args:
-                print(f"{arg}: {config_vars[arg]} -> {args[arg]}")
+                print(f"{arg}: {config_vars[arg]} -> {command_line_args[arg]}")
             if_overwrite = input("Overwrite all of them? (*/N - enter 'N' to NOT overwrite, other keys to skip)")
             if if_overwrite != 'N':
                 for arg in diff_args:
