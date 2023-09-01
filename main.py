@@ -85,8 +85,6 @@ parser.add_argument('-lm', '--learning_methods', type=str, default=1111, help='1
 args = parser.parse_args()
 args = args.__dict__
 
-command_line_args = parser.parse_known_args()
-
 # https://stackoverflow.com/questions/60058588/tesnorflow-2-0-tf-random-set-seed-not-working-since-i-am-getting-different-resul
 def reset_random_seeds():
    os.environ['PYTHONHASHSEED']=str(args["seed"])
@@ -126,6 +124,15 @@ if args['resume_path']:
         config_vars['resume_path'] = logs_dirpath
         # confirm overwritten args
         diff_args = {}
+        # get only the command line args - https://stackoverflow.com/questions/67955098/python-argument-parser-parse-only-from-console
+        NOTHING = object()
+        mask = argparse.Namespace(**{arg: NOTHING for arg in args})
+        masked_namespace = parser.parse_args(namespace=mask)
+        command_line_args = {
+            arg: value
+            for arg, value in vars(masked_namespace).items()
+            if value is not NOTHING
+        }
         for arg in command_line_args:
             if command_line_args[arg] != config_vars[arg]:
                 diff_args[arg] = command_line_args[arg]
