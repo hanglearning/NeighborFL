@@ -600,7 +600,7 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
     print_text = f"Comm round {comm_round} takes {(end_time-start_time).total_seconds() / 60} minutes."
     print("\n" + "-" * len(print_text) + "\n" + print_text)
     
-    print(f"Saving progress for comm_round {comm_round} and predictions in comm_round {comm_round + 1}...")
+    print(f"Saving progress for comm_round {comm_round}...")
 
     print("Saving Predictions...")                          
     predictions_record_saved_path = f'{logs_dirpath}/check_point/all_device_predicts.pkl'
