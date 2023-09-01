@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import matplotlib.lines as mlines
 import math
+import random
 import pandas as pd
 
 import sys
@@ -34,6 +35,7 @@ parser.add_argument('-row', '--row', type=int, default=1, help='number of rows i
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in the plot')
 parser.add_argument('-sr', '--start_round', type=int, default=1, help='provide the starting communication round, by default the 1st round of the simulation')
 parser.add_argument('-er', '--end_round', type=int, default=None, help='provide the ending communication round, by default the last round of the simulation')
+parser.add_argument('-Oseqs', '--output_sequences', type=str, default='1', help='For predictions having output_length > 1, specify the output sequences to plot. For instance, for a prediction having output_length as 5, e.g., [50.72 , 51.77 , 49.75, 66.02 , 66.92], speicying "24" will plot one for the 2nd prediction taking 51.77, and another plot for the 4th prediction taking 66.02. Default to 1.')
 parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no single figure will be generated')
 
 args = parser.parse_args()
@@ -73,6 +75,13 @@ if ROW != 1 and COL is None:
         COL = math.ceil((len(device_predicts) - 1) / ROW)
 
 ''' load vars '''
+
+# get output length
+OUTPUT_LENGTH = len(random.choice(list(device_predicts.values()))['true'][-1][-1][-1])
+
+# get plotting output sequences
+output_sequences = [int(x) for x in args["output_sequences"]]
+
 start_round = args["start_round"]
 end_round = args["end_round"]
 if not end_round:
@@ -81,43 +90,52 @@ if not end_round:
 plot_dir_path = f'{logs_dirpath}/plots/realtime_errors_interval'
 os.makedirs(plot_dir_path, exist_ok=True)
 
-def construct_realtime_error_table(realtime_predicts):
+def construct_realtime_error_table(realtime_predicts, output_seq):
     realtime_error_table_normalized = {}
+    avail_models = list(random.choice(list(realtime_predicts.values())).keys())
+    avail_models.remove('true')
+    a_random_model = random.choice(avail_models)
     for sensor_file, models_attr in realtime_predicts.items():
       sensor_id = sensor_file.split('.')[0]
       realtime_error_table_normalized[sensor_id] = {}
       xticklabels = [[1]]
       for model, predicts in models_attr.items():
-        if predicts and model != 'true' and model != 'offline_fl':
+        if predicts and model != 'true':
           realtime_error_table_normalized[sensor_id][model] = []
-
-          data_list = []
-          true_data_list = []
-          first_round_skip = False
-          for predict_iter in range(len(predicts)):
-            predict = predicts[predict_iter] 
-            # see plot_realtime_learning_curves.py, to be deleted in final version
+          predictions_list = []
+          true_predictions_list = []
+          for i, predict in enumerate(predicts):
             round = predict[0]
             if round > end_round:
                 break
-            data = predict[1]
-            true_data = models_attr['true'][predict_iter][1]
-            data_list.extend(data)
-            true_data_list.extend(true_data)
-            if (not first_round_skip and (round + 1) % args["error_interval"] == 0) or (first_round_skip and round != args["error_interval"] and round % args["error_interval"] == 0):
+            predictions = predict[1][:,output_seq-1:output_seq].flatten()
+            # special dealing with ground truth
+            if round > 1:
+                # drop earlist for ground truth
+                true_data = models_attr['true'][i][1][OUTPUT_LENGTH - 1:]
+            else:
+                true_data = models_attr['true'][i][1]
+            # extend O-1 more truth instances from the next record
+            if i + 1 < len(predicts):
+                true_data = np.concatenate((true_data, models_attr['true'][i + 1][1][:OUTPUT_LENGTH - 1]))
+            true_data = true_data[:,output_seq-1:output_seq].flatten()
+            predictions_list.extend(predictions)
+            true_predictions_list.extend(true_data)
+            if (round % args["error_interval"] == 0):
                 # conclude the errors
-                realtime_error_table_normalized[sensor_id][model].append(globals()[f"get_{args['error_type']}"](true_data_list, data_list))
-                data_list = []
-                true_data_list = []
-                first_round_skip = True
+                len_truth = len(true_predictions_list) # offset for the last O-1 predictions
+                realtime_error_table_normalized[sensor_id][model].append(globals()[f"get_{args['error_type']}"](true_predictions_list, predictions_list[:len_truth]))
+                predictions_list = []
+                true_predictions_list = []
                 # deal with xticklabels
-                if model == 'neighbor_fl':
-                    # only need one iteration to form this list (by specifying one model)
+                if model == a_random_model:
+                    # specify one random model to form this list
                     xticklabels[-1].append(round)
                     xticklabels.append([round + 1])
           # if there's leftover
-          if data_list and true_data_list:
-            realtime_error_table_normalized[sensor_id][model].append(globals()[f"get_{args['error_type']}"](true_data_list, data_list))
+          if predictions_list and true_predictions_list:
+            len_truth = len(true_predictions_list) # offset for the last O-1 predictions
+            realtime_error_table_normalized[sensor_id][model].append(globals()[f"get_{args['error_type']}"](true_predictions_list, predictions_list[:len_truth]))
 
     
     xticklabels[-1].append(end_round)
@@ -147,7 +165,7 @@ def compare_l1_smallest_equal_percent(l1, l2, l3):
     percent_string = f"{percentage:.2%}"
     return percentage, percent_string
 
-def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabels, width, length, hspace):
+def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabels, width, length, hspace, output_seq):
 
     error_to_plot = args["error_type"]
 
@@ -202,7 +220,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
         ax.legend(handles=legend_handles, loc='upper right', prop={'size': 10})        
         
         fig.set_size_inches(10, 2) # width, height
-        plt.savefig(f'{plot_dir_path}/real_time_errors_{rep_sensor_id}_{error_to_plot}.png', bbox_inches='tight', dpi=500)
+        plt.savefig(f'{plot_dir_path}/real_time_errors_{rep_sensor_id}_{error_to_plot}_Oseq_{output_seq}.png', bbox_inches='tight', dpi=500)
 
     # draw subplots
     if rep_sensor_id:
@@ -278,7 +296,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
     
     fig.subplots_adjust(hspace=hspace)
     fig.set_size_inches(width, length)
-    plt.savefig(f'{plot_dir_path}/real_time_errors_all_sensors_{error_to_plot}.png', bbox_inches='tight', dpi=300)
+    plt.savefig(f'{plot_dir_path}/real_time_errors_all_sensors_{error_to_plot}Oseq_{output_seq}.png', bbox_inches='tight', dpi=300)
     # plt.show()
 
     # print the comparison stat
@@ -286,7 +304,7 @@ def plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabel
        print(f"fav_beats_{model_name}: {model_to_red_label_counts[model_name]}")
 
 
-def save_error_df(realtime_error_table, xticklabels, models_in_df):
+def save_error_df(realtime_error_table, xticklabels, models_in_df, output_seq):
     error_df = pd.DataFrame(columns=["ID", "Model"] + [f'R{r[0]}-R{r[-1]}' for r in xticklabels] + ["Surpass Percentage"])
     for device_id, model_errors in realtime_error_table.items():
         for model_name, error_values in model_errors.items():
@@ -301,7 +319,7 @@ def save_error_df(realtime_error_table, xticklabels, models_in_df):
 
     # highlight error values if beaten by model to compare
 
-    error_df.to_csv(f'{plot_dir_path}/real_time_errors_all_sensors_{args["error_type"]}.csv')
+    error_df.to_csv(f'{plot_dir_path}/real_time_errors_all_sensors_{args["error_type"]}_Oseq_{output_seq}.csv')
 
 def calc_average_prediction_error(realtime_error_table):
     model_to_errors_accum = {}
@@ -316,14 +334,20 @@ def calc_average_prediction_error(realtime_error_table):
        model_to_avg_err[model] = round(np.average(errors, axis=0), 2)
        print(f"Avg {NAMES[model]} {args['error_type']}: {model_to_avg_err[model]}")
     return model_to_avg_err
+
+for output_seq in output_sequences:
+    print(f"For output sequence {output_seq}")
+    if output_seq > OUTPUT_LENGTH:
+        print(f"output_seq {output_seq} not available.")
+        continue
     
-realtime_error_table, xticklabels = construct_realtime_error_table(device_predicts)
+    realtime_error_table, xticklabels = construct_realtime_error_table(device_predicts, output_seq)
 
-# show plots
-to_compare_model = 'neighbor_fl'
-print(f"Plotting {args['error_type']}...")
-plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabels, 11, 10, 0.2)
+    # plotting
+    to_compare_model = 'neighbor_fl'
+    print(f"Plotting {args['error_type']}...")
+    plot_realtime_errors(realtime_error_table, to_compare_model, COL, xticklabels, 11, 10, 0.2, output_seq)
 
-models_in_df = ["neighbor_fl", "naive_fl", "central", "radius_naive_fl"] # index 0 model to compare
-save_error_df(realtime_error_table, xticklabels, models_in_df)
-# calc_average_prediction_error(realtime_error_table)
+    models_in_df = ["neighbor_fl", "naive_fl", "central", "radius_naive_fl"] # index 0 model to compare
+    save_error_df(realtime_error_table, xticklabels, models_in_df, output_seq)
+    # calc_average_prediction_error(realtime_error_table)

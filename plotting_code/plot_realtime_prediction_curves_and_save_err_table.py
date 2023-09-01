@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 from collections import deque
 import math
+import random
 
 import pandas as pd
 import numpy as np
@@ -39,6 +40,8 @@ parser.add_argument('-r', '--representative', type=str, default=None, help='devi
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
 parser.add_argument('-attr', '--attribute', type=str, default='Speed', help='prediciting feature')
+parser.add_argument('-Oseqs', '--output_sequences', type=str, default='1', help='For predictions having output_length > 1, specify the output sequences to plot. For instance, for a prediction having output_length as 5, e.g., [50.72 , 51.77 , 49.75, 66.02 , 66.92], speicying "24" will plot one for the 2nd prediction taking 51.77, and another plot for the 4th prediction taking 66.02. Default to 1.')
+
 
 args = parser.parse_args()
 args = args.__dict__
@@ -79,6 +82,8 @@ if not args["starting_comm_round"]:
 else:
     s_round = args["starting_comm_round"]
     e_round = s_round + plot_rounds - 1
+
+s_round = max(1, s_round)
     
 ROW = args["row"]
 COL = args["column"]
@@ -92,7 +97,13 @@ if ROW != 1 and COL is None:
 plot_dir_path = f'{logs_dirpath}/plots/realtime_learning_curves_all_devices'
 os.makedirs(plot_dir_path, exist_ok=True)
 
-def make_plot_data(device_predicts, skip_models):
+# get output length
+OUTPUT_LENGTH = len(random.choice(list(device_predicts.values()))['true'][-1][-1][-1])
+
+# get plotting output sequences
+output_sequences = [int(x) for x in args["output_sequences"]]
+
+def make_plot_data(device_predicts, skip_models, output_seq):
     device_lists = [device_file.split('.')[0] for device_file in device_predicts.keys()]
     
     plot_data = {}
@@ -108,14 +119,28 @@ def make_plot_data(device_predicts, skip_models):
 
         plot_data[device_id][model] = []
         
-        for predict in predicts:
+        for i, predict in enumerate(predicts):
             round = predict[0]
+            if model == 'true':
+                # special dealing with ground truth
+                if round > 1:
+                    # drop earlist for ground truth
+                    values = predict[1][OUTPUT_LENGTH - 1:]
+                else:
+                    values = predict[1]
+                # extend O-1 more truth instances from the next record
+                if i + 1 < len(predicts):
+                    values = np.concatenate((values, predicts[i + 1][1][:OUTPUT_LENGTH - 1]))
+                values = values[:,output_seq-1:output_seq].flatten()
+            else:
+                values = predict[1][:,output_seq-1:output_seq].flatten()
+            
             if round in range(s_round, e_round + 1):
-                plot_data[device_id][model].extend(predict[1])
+                plot_data[device_id][model].extend(values)
 
     return device_lists, plot_data
   
-def plot_and_save_two_rows(device_lists, plot_data):
+def plot_and_save_two_rows(device_lists, plot_data, output_seq):
     global COL # Not sure why have to do this here, and not for ROW
     """Plot
     Plot the true data and predicted data.
@@ -152,7 +177,7 @@ def plot_and_save_two_rows(device_lists, plot_data):
         ax.legend(handles=legend_handles, loc='best', prop={'size': 10})
         
         fig.set_size_inches(10, 2) # width, height
-        plt.savefig(f'{plot_dir_path}/single_figure_{rep_sensor_id}_.png', bbox_inches='tight', dpi=500)
+        plt.savefig(f'{plot_dir_path}/single_figure_{rep_sensor_id}_Oseq_{output_seq}.png', bbox_inches='tight', dpi=500)
         # plt.show()
 
     # draw subplots
@@ -211,17 +236,18 @@ def plot_and_save_two_rows(device_lists, plot_data):
     
     # fig.subplots_adjust(hspace=1)
     fig.set_size_inches(10, 10)
-    plt.savefig(f'{plot_dir_path}/multi_figure.png', bbox_inches='tight', dpi=300)
+    plt.savefig(f'{plot_dir_path}/multi_figure_Oseq_{output_seq}.png', bbox_inches='tight', dpi=300)
     # plt.show()
 
-def calculate_errors_and_output_table(plot_data, err_type):
+def calculate_errors_and_output_table(plot_data, err_type, output_seq):
     # plotting_range = int(60/time_res*plot_rounds)
     device_id_to_model_errors = {}
     for device_id, prediction_method in plot_data.items():
         model_to_error = {}
         for model, predicts in prediction_method.items():
             if model != 'true' and predicts:
-                model_to_error[model] = globals()[f'get_{err_type}'](prediction_method['true'], predicts)
+                len_truth = len(prediction_method['true']) # offset for the last O-1 predictions
+                model_to_error[model] = globals()[f'get_{err_type}'](prediction_method['true'], predicts[:len_truth])
         device_id_to_model_errors[device_id] = model_to_error
     
     avg_model_error_by_device = device_id_to_model_errors
@@ -233,7 +259,7 @@ def calculate_errors_and_output_table(plot_data, err_type):
     # ChatGPT generated
 
     # Create a Pandas Excel writer using XlsxWriter as the engine.
-    writer = pd.ExcelWriter(f'{plot_dir_path}/{err_type}_errors_rounds_{s_round}_{e_round}.xlsx', engine='xlsxwriter')
+    writer = pd.ExcelWriter(f'{plot_dir_path}/{err_type}_errors_rounds_{s_round}_{e_round}_Oseq_{output_seq}.xlsx', engine='xlsxwriter')
 
     # Convert the dataframe to an XlsxWriter Excel object.
     err_df.to_excel(writer, sheet_name='Sheet1')
@@ -254,7 +280,7 @@ def calculate_errors_and_output_table(plot_data, err_type):
 
     return avg_model_error_by_device
 
-def calc_average_prediction_error(avg_model_error_by_device, error_type):
+def calc_average_prediction_error(avg_model_error_by_device, error_type, output_seq):
     model_to_errors_accum = {}
     for device_id, model_errors in avg_model_error_by_device.items():
         for model_name, error_value in model_errors.items():
@@ -264,11 +290,16 @@ def calc_average_prediction_error(avg_model_error_by_device, error_type):
     model_to_avg_err = {}
     for model, errors in model_to_errors_accum.items():
        model_to_avg_err[model] = round(np.average(errors, axis=0), 2)
-       print(f"Avg {NAMES[model]} {error_type}: {model_to_avg_err[model]}")
+       print(f"Oseq{output_seq}, Avg {NAMES[model]} {error_type}: {model_to_avg_err[model]}")
     return model_to_avg_err
     
-
-device_lists, plot_data = make_plot_data(device_predicts, ['offline_fl'])
-plot_and_save_two_rows(device_lists, plot_data)
-avg_model_error_by_device = calculate_errors_and_output_table(plot_data, "MSE")
-calc_average_prediction_error(avg_model_error_by_device, "MSE")
+for output_seq in output_sequences:
+    print(f"For output sequence {output_seq}")
+    if output_seq > OUTPUT_LENGTH:
+        print(f"output_seq {output_seq} not available.")
+        continue
+    print(f"Output sequence {output_seq} out of {output_sequences}...")
+    device_lists, plot_data = make_plot_data(device_predicts, [], output_seq)
+    plot_and_save_two_rows(device_lists, plot_data, output_seq)
+    avg_model_error_by_device = calculate_errors_and_output_table(plot_data, "MSE", output_seq)
+    calc_average_prediction_error(avg_model_error_by_device, "MSE", output_seq)
