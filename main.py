@@ -118,11 +118,23 @@ print("Preparing - i.e., create device objects, init models, load data, etc,.\nT
 if args['resume_path']:
     logs_dirpath = args['resume_path']
     Device.logs_dirpath = logs_dirpath
-    # load saved variables
+    # load saved variables and see if there are arguments to overwrite
     with open(f"{logs_dirpath}/check_point/config_vars.pkl", 'rb') as f:
-        # overwrite all args
         config_vars = pickle.load(f)
         config_vars['resume_path'] = logs_dirpath
+        # confirm overwritten args
+        diff_args = {}
+        for arg in args:
+            if args[arg] != config_vars[arg]:
+                diff_args[arg] = args[arg]
+        if diff_args:
+            print("Please confirm the following args to overwrite:")
+            for arg in diff_args:
+                print(f"{arg}: {config_vars[arg]} -> {args[arg]}")
+            if_overwrite = input("Overwrite all of them? (*/N - enter 'N' to NOT overwrite, other keys to skip)")
+            if if_overwrite != 'N':
+                for arg in diff_args:
+                    config_vars[arg] = diff_args[arg]
     with open(f'{logs_dirpath}/check_point/all_device_predicts.pkl', 'rb') as f:
         device_predicts = pickle.load(f)
     with open(f'{logs_dirpath}/check_point/fav_neighbors_by_round.pkl', 'rb') as f:
