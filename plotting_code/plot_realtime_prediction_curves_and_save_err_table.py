@@ -27,7 +27,7 @@ from error_calc import get_MAPE
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="traffic_fedavg plot learning curves")
 
 # arguments for system vars
-parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_device_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
+parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_device_predicts.pkl, e.g., /content/drive/MyDrive/NeighborFL/logs/09212021_142926_lstm')
 parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
 
 parser.add_argument('-pr', '--plot_rounds', type=int, default=24, help='The number of comm rounds to plot. If starting_comm_round are not specified, plots the last these number of rounds.')

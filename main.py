@@ -38,8 +38,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="NeighborFL Simulation")
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/traffic_data/csv', help='dataset path')
-parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/NeighborFL_logs", help='base folder path to store running logs and h5 files')
+parser.add_argument('-dp', '--dataset_path', type=str, default=None, help='dataset path')
+parser.add_argument('-lb', '--logs_base_folder', type=str, default=None, help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 
@@ -61,7 +61,6 @@ parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number pe
 parser.add_argument('-lp', '--data_load_percent', type=float, default=1.0, help='percentage of the data to load. Preserve RAM if fewer comm rounds is specified in -c.')
 parser.add_argument('-si', '--start_train_index', type=int, default=0, help='start FL at this data index, usually to accommodate pretrained models')
 parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, help='pretrained models path. If not provided, the program will train from scratch')
-# parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/pretrained_models')
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
@@ -113,6 +112,13 @@ neighbor_fl_local_model_path = 'neighbor_fl_local'
 neighbor_fl_agg_model_path = 'neighbor_fl_agg'
 eval_neighbor_fl_agg_model_path = 'eval_neighbor_fl_agg'
 
+# init default dataset folder if not specified
+if not args["dataset_path"]:
+    args["dataset_path"] = f"{os.getcwd()}/data/"
+
+# init default log root folder if not specified
+if not args["logs_base_folder"]:
+    args["logs_base_folder"] = f"{os.getcwd()}/logs/"
 
 print("Preparing - i.e., create device objects, init models, load data, etc,.\nThis may take a few minutes...")
 # determine if resume training
@@ -138,6 +144,8 @@ if args['resume_path']:
             if command_line_args[arg] != config_vars[arg]:
                 diff_args[arg] = command_line_args[arg]
         if diff_args:
+            if 'dataset_path' in diff_args:
+                print("Note, dataset is configured during the initial run and won't be overwritten, even if you specify a new/different dataset_path.")
             print("Please confirm the following args to overwrite:")
             for arg in diff_args:
                 print(f"{arg}: {config_vars[arg]} -> {command_line_args[arg]}")

@@ -27,7 +27,7 @@ from tabulate import tabulate
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="inferencing code")
 
-parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/09212021_142926_lstm')
+parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the realtime_predicts.pkl, e.g., /content/drive/MyDrive/NeighborFL/logs/09212021_142926_lstm')
 parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
 parser.add_argument('-et', '--error_type', type=str, default="MSE", help='error type to calculate, namely MAE, MSE, MAPE, RMSE.')
 parser.add_argument('-ei', '--error_interval', type=int, default=24, help='unit is comm rounds, used in showing error table. will plot (-ei - 1) rounds')
