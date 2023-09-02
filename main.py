@@ -66,6 +66,7 @@ parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, h
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
 parser.add_argument('-ms', '--max_data_size', type=int, default=72, help='maximum data length for training in each communication round, simulating the memory size the devices have')
+parser.add_argument('-la', '--learning_attribute', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
 
 # arguments for NeighborFL
 parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
@@ -265,7 +266,7 @@ else:
         device_TO_fav_neighbors_BY_round[sensor_id] = []
     
     ''' get scaler '''
-    scaler = get_scaler(pd.concat(list(whole_data_record.values())))
+    scaler = get_scaler(pd.concat(list(whole_data_record.values())), config_vars['learning_attribute'])
     config_vars["scaler"] = scaler
     
     ''' save used arguments as a text file for easy review '''
@@ -350,12 +351,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # slice training data
         train_data = whole_data_record[sensor_id][training_start_index: end_collected_data_index + 1]
         # process training data
-        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH)
+        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, config_vars['learning_attribute'])
         ''' Process test data '''
         # slice test data
         test_data = whole_data_record[sensor_id][test_data_start_index: end_collected_data_index + 1]
         # process test data
-        X_test, y_true = process_test_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round)
+        X_test, y_true = process_test_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, config_vars['learning_attribute'])
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))

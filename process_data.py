@@ -1,19 +1,16 @@
 import numpy as np
 
 """ Functions to process the data for training and predicting
-
-NOTE - set the `attr` value for the learning and predicting feature 
 """
 
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-attr = 'Speed'
 
-def get_scaler(df_whole):
+def get_scaler(df_whole, attr):
     scaler = MinMaxScaler(feature_range=(0, 1)).fit(df_whole[attr].values.reshape(-1, 1))
     return scaler
 
-def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH):
+def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, attr):
     
     flow_data = scaler.transform(df_data[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
     data_set = []
@@ -27,7 +24,7 @@ def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH):
 
     return X, y  
 
-def process_test_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round):
+def process_test_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, attr):
     
     flow_data = scaler.transform(df_data[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
     X, y = [], []
