@@ -95,11 +95,11 @@ def construct_realtime_error_table(realtime_predicts, output_seq):
     avail_models = list(random.choice(list(realtime_predicts.values())).keys())
     avail_models.remove('true')
     a_random_model = random.choice(avail_models)
-    for sensor_file, models_attr in realtime_predicts.items():
+    for sensor_file, models_feature in realtime_predicts.items():
       sensor_id = sensor_file.split('.')[0]
       realtime_error_table_normalized[sensor_id] = {}
       xticklabels = [[1]]
-      for model, predicts in models_attr.items():
+      for model, predicts in models_feature.items():
         if predicts and model != 'true':
           realtime_error_table_normalized[sensor_id][model] = []
           predictions_list = []
@@ -112,12 +112,12 @@ def construct_realtime_error_table(realtime_predicts, output_seq):
             # special dealing with ground truth
             if round > 1:
                 # drop earlist for ground truth
-                true_data = models_attr['true'][i][1][OUTPUT_LENGTH - 1:]
+                true_data = models_feature['true'][i][1][OUTPUT_LENGTH - 1:]
             else:
-                true_data = models_attr['true'][i][1]
+                true_data = models_feature['true'][i][1]
             # extend O-1 more truth instances from the next record
             if i + 1 < len(predicts):
-                true_data = np.concatenate((true_data, models_attr['true'][i + 1][1][:OUTPUT_LENGTH - 1]))
+                true_data = np.concatenate((true_data, models_feature['true'][i + 1][1][:OUTPUT_LENGTH - 1]))
             true_data = true_data[:,output_seq-1:output_seq].flatten()
             predictions_list.extend(predictions)
             true_predictions_list.extend(true_data)

@@ -6,13 +6,13 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 
-def get_scaler(df_whole, attr):
-    scaler = MinMaxScaler(feature_range=(0, 1)).fit(df_whole[attr].values.reshape(-1, 1))
+def get_scaler(df_whole, feature):
+    scaler = MinMaxScaler(feature_range=(0, 1)).fit(df_whole[feature].values.reshape(-1, 1))
     return scaler
 
-def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, attr):
+def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, feature):
     
-    flow_data = scaler.transform(df_data[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
+    flow_data = scaler.transform(df_data[feature].values.reshape(-1, 1)).reshape(1, -1)[0]
     data_set = []
     
     for i in range(INPUT_LENGTH, len(flow_data) - (OUTPUT_LENGTH - 1)):
@@ -24,9 +24,9 @@ def process_train_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, attr):
 
     return X, y  
 
-def process_test_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, attr):
+def process_test_data(df_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, feature):
     
-    flow_data = scaler.transform(df_data[attr].values.reshape(-1, 1)).reshape(1, -1)[0]
+    flow_data = scaler.transform(df_data[feature].values.reshape(-1, 1)).reshape(1, -1)[0]
     X, y = [], []
     
     # get y

@@ -38,8 +38,8 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="NeighborFL Simulation")
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/csv', help='dataset path')
-parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/Hang_NeighborFL/NeighborFL_logs", help='base folder path to store running logs and h5 files')
+parser.add_argument('-dp', '--dataset_path', type=str, default='/content/drive/MyDrive/traffic_data/csv', help='dataset path')
+parser.add_argument('-lb', '--logs_base_folder', type=str, default="/content/drive/MyDrive/NeighborFL_logs", help='base folder path to store running logs and h5 files')
 parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
 parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
 
@@ -61,12 +61,12 @@ parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number pe
 parser.add_argument('-lp', '--data_load_percent', type=float, default=1.0, help='percentage of the data to load. Preserve RAM if fewer comm rounds is specified in -c.')
 parser.add_argument('-si', '--start_train_index', type=int, default=0, help='start FL at this data index, usually to accommodate pretrained models')
 parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, help='pretrained models path. If not provided, the program will train from scratch')
-# parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/Hang_PeMS/pretrained_models')
+# parser.add_argument('-pp', '--pretrained_models_path', type=str, default='/content/drive/MyDrive/pretrained_models')
 
 # arguments for federated learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
 parser.add_argument('-ms', '--max_data_size', type=int, default=72, help='maximum data length for training in each communication round, simulating the memory size the devices have')
-parser.add_argument('-la', '--learning_attribute', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
 
 # arguments for NeighborFL
 parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
@@ -266,7 +266,7 @@ else:
         device_TO_fav_neighbors_BY_round[sensor_id] = []
     
     ''' get scaler '''
-    scaler = get_scaler(pd.concat(list(whole_data_record.values())), config_vars['learning_attribute'])
+    scaler = get_scaler(pd.concat(list(whole_data_record.values())), config_vars['feature'])
     config_vars["scaler"] = scaler
     
     ''' save used arguments as a text file for easy review '''
@@ -351,12 +351,12 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
         # slice training data
         train_data = whole_data_record[sensor_id][training_start_index: end_collected_data_index + 1]
         # process training data
-        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, config_vars['learning_attribute'])
+        X_train, y_train = process_train_data(train_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, config_vars['feature'])
         ''' Process test data '''
         # slice test data
         test_data = whole_data_record[sensor_id][test_data_start_index: end_collected_data_index + 1]
         # process test data
-        X_test, y_true = process_test_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, config_vars['learning_attribute'])
+        X_test, y_true = process_test_data(test_data, scaler, INPUT_LENGTH, OUTPUT_LENGTH, comm_round, config_vars['feature'])
         # reshape data
         for data_set in ['X_train', 'X_test']:
             vars()[data_set] = np.reshape(vars()[data_set], (vars()[data_set].shape[0], vars()[data_set].shape[1], 1))

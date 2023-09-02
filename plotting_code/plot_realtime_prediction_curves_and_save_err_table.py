@@ -39,7 +39,7 @@ parser.add_argument('-nmx', '--num_mul_xticks', type=int, default=4, help='how m
 parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no single figure will be generated')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
 parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
-parser.add_argument('-attr', '--attribute', type=str, default='Speed', help='prediciting feature')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='prediciting feature')
 parser.add_argument('-Oseqs', '--output_sequences', type=str, default='1', help='For predictions having output_length > 1, specify the output sequences to plot. For instance, for a prediction having output_length as 5, e.g., [50.72 , 51.77 , 49.75, 66.02 , 66.92], speicying "24" will plot one for the 2nd prediction taking 51.77, and another plot for the 4th prediction taking 66.02. Default to 1.')
 
 
@@ -107,11 +107,11 @@ def make_plot_data(device_predicts, skip_models, output_seq):
     device_lists = [device_file.split('.')[0] for device_file in device_predicts.keys()]
     
     plot_data = {}
-    for device_file, models_attr in device_predicts.items():
+    for device_file, models_feature in device_predicts.items():
       device_id = device_file.split('.')[0]
       plot_data[device_id] = {}
 
-      for model, predicts in models_attr.items():
+      for model, predicts in models_feature.items():
 
         # models to skip
         if model in skip_models or not predicts:
@@ -151,7 +151,7 @@ def plot_and_save_two_rows(device_lists, plot_data, output_seq):
     if rep_sensor_id:
         fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
         plt.setp(ax, ylim=(15, 75))
-        fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical')
+        fig.text(0.04, 0.5, args['feature'], va='center', rotation='vertical')
         ax.set_xlabel('Round Index')
         
         ax.set_title(rep_sensor_id)
@@ -186,9 +186,9 @@ def plot_and_save_two_rows(device_lists, plot_data, output_seq):
         COL = len(device_lists)
     fig, axs = plt.subplots(ROW, COL, sharex=True, sharey=True)
     plt.setp(axs, ylim=(0, 75))
-    # axs[0].set_ylabel(args['attribute'])
+    # axs[0].set_ylabel(args['feature'])
     # fig.text(0.5, 0.04, 'Round Index', ha='center', size=13)
-    fig.text(0.04, 0.5, args['attribute'], va='center', rotation='vertical', size=13)
+    fig.text(0.04, 0.5, args['feature'], va='center', rotation='vertical', size=13)
     if ROW == 1 and COL == 1:
         axs.set_xlabel('Round Index', size=13)
     elif ROW == 1 and COL > 1:

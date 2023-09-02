@@ -44,7 +44,7 @@ parser.add_argument('-e', '--epochs', type=int, default=5, help='pretrain epoch 
 parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.0, help='percentage of the data for pretraining')
 parser.add_argument('-si', '--pretrain_start_index', type=int, default=0, help='the starting row for the pretrained models')
 parser.add_argument('-ei', '--pretrain_end_index', type=int, default=0, help='till which row in df we do pretrain. if this is provide, overwrite -pp')
-parser.add_argument('-la', '--learning_attribute', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
 parser.add_argument('-sp', '--model_save_path', type=str, default="/content/drive/MyDrive/Hang_NeighborFL/PeMS-Bay 061223/PeMS-Bay Selected/pretrained_models", help='the path to save the pretrained models')
 
 args = parser.parse_args()
@@ -96,7 +96,7 @@ for device_file_iter in range(len(all_device_files)):
     whole_data_record[sensor_id] = whole_data
 
     ''' get scaler '''
-    scaler = get_scaler(pd.concat(list(whole_data_record.values())), args['learning_attribute'])
+    scaler = get_scaler(pd.concat(list(whole_data_record.values())), args['feature'])
 
 sample_sensor_id = list(whole_data_record.keys())[0]
 start_timestamp = whole_data_record[sample_sensor_id].iloc[args["pretrain_start_index"]]['Timestamp']
@@ -106,7 +106,7 @@ print(f"Pretraining starts with {start_timestamp} and end with {end_timestamp} (
 for sensor_id, data in whole_data_record.items():
     ''' Process traning data '''
     # process training data
-    X_train, y_train = process_train_data(data, scaler, args['input_length'], args['output_length'], args['learning_attribute'])
+    X_train, y_train = process_train_data(data, scaler, args['input_length'], args['output_length'], args['feature'])
 
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
