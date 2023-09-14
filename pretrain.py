@@ -30,22 +30,22 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 
 # arguments for system vars
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="KFRT pretrain")
-parser.add_argument('-dp', '--dataset_path', type=str, default=None, help='dataset path')
-parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
-parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
+parser.add_argument('-dp', '--dataset_path', type=str, default=None, help='path to traffic datasets')
+parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed value specified for reproducibility')
+parser.add_argument('-m', '--model', type=str, default='lstm', help='choose LSTM or GRU model for Central/Federated simulations. add new model structures in create_model.py')
 parser.add_argument('-I', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
 parser.add_argument('-O', '--output_length', type=int, default=1, help='output length for the LSTM/GRU network')
 parser.add_argument('-hn', '--hidden_neurons', type=int, default=128, help='number of neurons in one of each 2 layers')
-parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss evaluation while training')
+parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss function used for training')
 parser.add_argument('-op', '--optimizer', type=str, default="rmsprop", help='optimizer for training')
-parser.add_argument('-me', '--metrics', type=str, default="mse", help='evaluation metrics to view for training')
+parser.add_argument('-me', '--metric', type=str, default="mse", help='evaluation metric by the model')
 parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for training')
 parser.add_argument('-e', '--epochs', type=int, default=5, help='pretrain epoch number')
-parser.add_argument('-pp', '--pretrain_percent', type=float, default=0.0, help='percentage of the data for pretraining')
+parser.add_argument('-pp', '--pretrain_percent', type=float, default=1.0, help='percentage of the data for pretraining')
 parser.add_argument('-si', '--pretrain_start_index', type=int, default=0, help='the starting row for the pretrained models')
-parser.add_argument('-ei', '--pretrain_end_index', type=int, default=0, help='till which row in df we do pretrain. if this is provide, overwrite -pp')
-parser.add_argument('-f', '--feature', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
-parser.add_argument('-sp', '--model_save_path', type=str, default="/content/drive/MyDrive/pretrained_models", help='the path to save the pretrained models')
+parser.add_argument('-ei', '--pretrain_end_index', type=int, default=None, help='till which row in df we do pretrain. if this is provide, overwrite -pp')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='feature used for training and prediction, depending on your traffic dataset, usually speed, volume, occupancy')
+parser.add_argument('-sp', '--model_save_path', type=str, default=None, help='the path to save the pretrained models')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -62,6 +62,9 @@ reset_random_seeds()
 if not args["dataset_path"]:
     args["dataset_path"] = f"{os.getcwd()}/data/"
 
+if not args["model_save_path"]:
+    args["model_save_path"] = f"{os.getcwd()}/pretrained_models/"
+
 # read in device file paths
 all_device_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
 print(f'We have {len(all_device_files)} devices available.')
@@ -70,8 +73,18 @@ print(f'We have {len(all_device_files)} devices available.')
 
 create_model = create_lstm if args["model"] == 'lstm' else create_gru
 model_units = [args['input_length'], args['hidden_neurons'], args['hidden_neurons'], args['output_length']]
-model_configs = [args['loss'], args['optimizer'], args['metrics']]
+model_configs = [args['loss'], args['optimizer'], args['metric']]
 global_model_0 = create_model(model_units, model_configs)
+
+''' save used arguments as a text file for easy review '''
+with open(f'{args["model_save_path"]}/args_used.txt', 'w') as f:
+    f.write("Command line arguments used -\n")
+    f.write(' '.join(sys.argv[1:]))
+    f.write("\n\nAll arguments used -\n")
+    for arg_name, arg in args.items():
+        f.write(f'\n--{arg_name} {arg}')
+    f.write("\nThis file is mainly used to recall the generated model structure.")
+
 
 ''' load data for each device '''
 min_read_line_num = float('inf')

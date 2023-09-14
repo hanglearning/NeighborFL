@@ -38,49 +38,47 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
 ''' Parse command line arguments '''
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="NeighborFL Simulation")
 # arguments for system vars
-parser.add_argument('-dp', '--dataset_path', type=str, default=None, help='dataset path')
+parser.add_argument('-dp', '--dataset_path', type=str, default=None, help='path to traffic datasets')
 parser.add_argument('-lb', '--logs_base_folder', type=str, default=None, help='base folder path to store running logs and h5 files')
-parser.add_argument('-pm', '--preserve_historical_models', type=int, default=0, help='whether to preserve models from old communication comm_rounds. Consume storage. Input 1 to preserve')
-parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed for reproducibility')
+parser.add_argument('-pm', '--preserve_historical_models', type=int, default=1, help='whether to preserve models from old communication rounds. Consume storage. Input 1 to preserve')
+parser.add_argument('-sd', '--seed', type=int, default=40, help='random seed value specified for reproducibility')
 
 # arguments for resume training
-parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the leftover log folder path to continue FL')
+parser.add_argument('-rp', '--resume_path', type=str, default=None, help='provide the interrupted log folder path to continue the simulation. note that the program will print out this folder path upon executing')
 
-# arguments for learning
-parser.add_argument('-m', '--model', type=str, default='lstm', help='Model to choose - lstm or gru')
-parser.add_argument('-I', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
-parser.add_argument('-tau1', '--tau1', type=int, default=24, help='number of data point collections and prediction amount in round 1, rule of thumb - 2 * tau')
-parser.add_argument('-tau2p', '--tau2p', type=int, default=12, help='number of data point collections and prediction amount in round 2 and beyond, rule of thumb - same as -I') # a better choice maybe t1 = t2 = 2 * -I
-parser.add_argument('-O', '--output_length', type=int, default=1, help='number of the prediction horizon, used to set up the number of the last layer of the model')
-parser.add_argument('-hn', '--hidden_neurons', type=int, default=128, help='number of neurons in one of each 2 layers')
-parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss evaluation while training')
-parser.add_argument('-op', '--optimizer', type=str, default="rmsprop", help='optimizer for training')
-parser.add_argument('-me', '--metrics', type=str, default="mape", help='evaluation metrics for training')
-parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for training')
-parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm comm_round for FL')
-parser.add_argument('-lp', '--data_load_percent', type=float, default=1.0, help='percentage of the data to load. Preserve RAM if fewer comm rounds is specified in -c.')
-parser.add_argument('-si', '--start_train_index', type=int, default=0, help='start FL at this data index, usually to accommodate pretrained models')
-parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, help='pretrained models path. If not provided, the program will train from scratch')
-
-# arguments for federated learning
+# arguments for Central/Federated Real-time Learning
 parser.add_argument('-c', '--comm_rounds', type=int, default=None, help='number of comm rounds, default aims to run until data is exhausted')
 parser.add_argument('-ms', '--max_data_size', type=int, default=72, help='maximum data length for training in each communication round, simulating the memory size the devices have')
-parser.add_argument('-f', '--feature', type=str, default='Speed', help='depending on your dataset and the model used, usually speed, volume, occupancy')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='feature used for training and prediction, depending on your traffic dataset, usually speed, volume, occupancy')
+parser.add_argument('-tau1', '--tau1', type=int, default=24, help='number of data point collections and prediction amount in round 1, rule of thumb: 2 * tau2p')
+parser.add_argument('-tau2p', '--tau2p', type=int, default=12, help='Number of data points collected, and also the number of predictions made in round 2 and beyond, rule of thumb - same as -I') # a better choice maybe t1 = t2 = 2 * -I
+parser.add_argument('-lm', '--learning_methods', type=str, default=1111, help='Enable learning methods for simulation. Use `1` to enable and `0` to disable. The indices correspond to: 1. Baseline centralized, 2. Pure FedAvg NaiveFL, 3. RadiusFL, 4. NeighborFL')
+
+# arguments for learning
+parser.add_argument('-m', '--model', type=str, default='lstm', help='choose LSTM or GRU model for Central/Federated simulations. add new model structures in create_model.py')
+parser.add_argument('-I', '--input_length', type=int, default=12, help='input length for the LSTM/GRU network')
+parser.add_argument('-O', '--output_length', type=int, default=1, help='number of the prediction horizon, used to set up the number of the last layer of the model')
+parser.add_argument('-hn', '--hidden_neurons', type=int, default=128, help='number of neurons in one of each 2 layers')
+parser.add_argument('-lo', '--loss', type=str, default="mse", help='loss function used for training')
+parser.add_argument('-op', '--optimizer', type=str, default="rmsprop", help='optimizer for training')
+parser.add_argument('-me', '--metric', type=str, default="mse", help='evaluation metric by the local model during training and testing')
+parser.add_argument('-b', '--batch', type=int, default=1, help='batch number for training')
+parser.add_argument('-e', '--epochs', type=int, default=5, help='epoch number per comm_round for Central/FL')
+parser.add_argument('-dlp', '--data_load_percent', type=float, default=1.0, help='percentage of the data to load. may overwrite -c.')
+parser.add_argument('-si', '--start_train_index', type=int, default=0, help='start the simulation at this data index, usually to accommodate pretrained models')
+parser.add_argument('-pp', '--pretrained_models_path', type=str, default=None, help='pretrained models path. Pretrained models path. If not provided, the program will create an initial model for all devices and train from scratch')
 
 # arguments for NeighborFL
-parser.add_argument('-r', '--radius', type=float, default=None, help='only treat the participants within radius as neighbors')
+parser.add_argument('-r', '--radius', type=float, default=1, help='Specifies the radius within which participants are treated as candidate favorite neighbors. Unit - mile.')
 parser.add_argument('-et', '--error_type', type=str, default="MSE", help='the error type to evaluate potential neighbors')
-parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to try in each comm_round')
+parser.add_argument('-nt', '--num_neighbors_try', type=int, default=1, help='how many new neighbors to evaluate in each comm_round')
 parser.add_argument('-ah', '--add_heuristic', type=int, default=1, help='heuristic to add fav neighbors: 1 - add by distance from close to far, 2 - add randomly')
-# arguments for NeighborFL kicking
-parser.add_argument('-kt', '--kick_trigger', type=int, default=2, help='to trigger a kick: 0 - never kick; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -nu')
-parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -kt 1, device has a probability to kick out worst neighbors to explore new neighbors')
-parser.add_argument('-nu', '--kick_rounds', type=int, default=3, help="a kick will be triggered if the error of the device's NeighborFL agg model has been increasing for -nu number of rounds. if -kt 1, a kick is triggered as soon as the error increases")
-parser.add_argument('-kn', '--kick_num', type=int, default=1, help='this number defines how many neighboring detecotors to kick having the worst reputation. Default to 1. Either this or -kp has to be specified, if both specified, randomly chosen')
-parser.add_argument('-ks', '--kick_strategy', type=int, default=1, help='1 - kick by worst reputation; 2 - kick randomly; 3 - always kick the last added one')
-
-# argument for enabling learning methods
-parser.add_argument('-lm', '--learning_methods', type=str, default=1111, help='1. baseline centralized, 2. pure FedAvg naive_fl, 3. raidus_fl, 4. neighbor_fl')
+# arguments for NeighborFL removing
+parser.add_argument('-rt', '--remove_trigger', type=int, default=2, help='to trigger a remove: 0 - never remove; 1 - trigger by probability, set by -ep; 2 - trigger by a consecutive rounds of error increase, set by -nu')
+parser.add_argument('-ep', '--epsilon', type=float, default=0.2, help='if -rt 1, device has a probability to remove out worst neighbors to explore new neighbors')
+parser.add_argument('-nu', '--remove_rounds', type=int, default=3, help="a remove will be triggered if the error of the device's NeighborFL agg model has been increasing for -nu number of rounds. if -nu 1, a removal is triggered as soon as the error increases")
+parser.add_argument('-rn', '--remove_num', type=int, default=1, help='this number defines how many favorite neighbors to remove having the worst reputation.')
+parser.add_argument('-rs', '--remove_strategy', type=int, default=1, help='1 - remove by worst reputation; 2 - remove randomly; 3 - always remove the last added one')
 
 args = parser.parse_args()
 args = args.__dict__
@@ -149,7 +147,7 @@ if args['resume_path']:
             print("Please confirm the following args to overwrite:")
             for arg in diff_args:
                 print(f"{arg}: {config_vars[arg]} -> {command_line_args[arg]}")
-            if_overwrite = input("Overwrite all of them? (*/N - enter 'N' to NOT overwrite, other keys to skip)")
+            if_overwrite = input("Overwrite all of them? (*/N - enter 'N' to NOT overwrite, or any other key to confirm overwrite.)")
             if if_overwrite != 'N':
                 for arg in diff_args:
                     config_vars[arg] = diff_args[arg]
@@ -169,7 +167,7 @@ if args['resume_path']:
     create_model = create_lstm if config_vars["model"] == 'lstm' else create_gru
     
     model_units = [config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], config_vars['output_length']]
-    model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metrics']]
+    model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metric']]
 else:
     ''' logistics '''
     config_vars = args
@@ -186,12 +184,9 @@ else:
 
     # create log folder indicating by current running date and time
     date_time = datetime.now().strftime("%m%d%Y_%H%M%S")
-    logs_dirpath = f"{config_vars['logs_base_folder']}/{date_time}_{config_vars['model']}_mds_{config_vars['max_data_size']}_epoch_{config_vars['epochs']}_ks_{config_vars['kick_strategy']}_I_{config_vars['input_length']}_O_{config_vars['output_length']}_lm_{config_vars['learning_methods']}"
+    logs_dirpath = f"{config_vars['logs_base_folder']}/{date_time}_{config_vars['model']}_mds_{config_vars['max_data_size']}_epoch_{config_vars['epochs']}_ks_{config_vars['remove_strategy']}_I_{config_vars['input_length']}_O_{config_vars['output_length']}_lm_{config_vars['learning_methods']}"
     os.makedirs(f"{logs_dirpath}/check_point", exist_ok=True)
     Device.logs_dirpath = logs_dirpath
-    
-    resume_text = f'To resume, use - \n $ python NeighborFL/main.py -rp "{logs_dirpath}"'
-    print(len(resume_text) * '*', "\n" + resume_text, "\n" + len(resume_text) * '*')
 
     ''' create device object and load data for each device '''
     whole_data_record = {} # to calculate scaler
@@ -229,7 +224,7 @@ else:
     create_model = create_lstm if config_vars["model"] == 'lstm' else create_gru
     
     model_units = [config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], config_vars['output_length']]
-    model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metrics']]
+    model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metric']]
 
     global_model_0 = create_model(model_units, model_configs)
     os.makedirs(f'{Device.logs_dirpath}/{naive_fl_global_model_path}', exist_ok=True)
@@ -284,9 +279,11 @@ else:
         f.write("\n\nAll arguments used -\n")
         for arg_name, arg in args.items():
             f.write(f'\n--{arg_name} {arg}')
-        f.write("\n\nNOTE: This file records the original command line arguments while executing the program the 1st time.")
+        f.write("\n\nNOTE: This file records the command line and default arguments while executing the program the 1st time.")
         f.write("\nPlease refer to the args saved in config_vars.pkl for the latest used env vars.")
 
+resume_text = f'To resume, use - \n $ python NeighborFL/main.py -rp "{logs_dirpath}"'
+print(len(resume_text) * '*', "\n" + resume_text, "\n" + len(resume_text) * '*')
 
 # init vars
 get_error = vars()[f'get_{config_vars["error_type"]}']
@@ -520,52 +517,52 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             # save model
             device.update_and_save_model(neighbor_fl_agg_model, comm_round, neighbor_fl_agg_model_path)
             
-            ''' kick some fav neighbors by rolling a dice and strategy '''
-            if_kick = False
-            if config_vars["kick_trigger"] == 1 and random.random() <= config_vars['epsilon']:
-                if_kick = True
-            if config_vars["kick_trigger"] == 2 and len(device.neighbor_fl_error_records) > config_vars['kick_rounds'] and not device.has_added_neigbor:
-                last_rounds_error = device.neighbor_fl_error_records[-(config_vars['kick_rounds'] + 1):]
+            ''' remove some fav neighbors by rolling a dice and strategy '''
+            if_remove = False
+            if config_vars["remove_trigger"] == 1 and random.random() <= config_vars['epsilon']:
+                if_remove = True
+            if config_vars["remove_trigger"] == 2 and len(device.neighbor_fl_error_records) > config_vars['remove_rounds'] and not device.has_added_neigbor:
+                last_rounds_error = device.neighbor_fl_error_records[-(config_vars['remove_rounds'] + 1):]
                 if all(x<y for x, y in zip(last_rounds_error, last_rounds_error[1:])):
-                    if_kick = True
-            # kick
-            if if_kick:
-                kick_num = config_vars["kick_num"]
+                    if_remove = True
+            # remove
+            if if_remove:
+                remove_num = config_vars["remove_num"]
                 rep_tuples = [(id, rep) for id, rep in sorted(device.neighbors_to_rep_score.items(), key=lambda x: x[1])]
-                if config_vars["kick_strategy"] == 1:
-                    # kick by lowest reputation
+                if config_vars["remove_strategy"] == 1:
+                    # remove by lowest reputation
                     # May need improve - since traffic always dynamically changes, newer round depends on older rounds error may not be reliable
                     for i in range(len(rep_tuples)):
-                        if kick_num > 0:
-                            to_kick_id = rep_tuples[i][0]
-                            if list_of_devices[to_kick_id] in device.fav_neighbors:
-                                device.fav_neighbors.remove(list_of_devices[to_kick_id])
-                                print(f"{sensor_id} kicks out {to_kick_id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
-                                kick_num -= 1
+                        if remove_num > 0:
+                            to_remove_id = rep_tuples[i][0]
+                            if list_of_devices[to_remove_id] in device.fav_neighbors:
+                                device.fav_neighbors.remove(list_of_devices[to_remove_id])
+                                print(f"{sensor_id} removes out {to_remove_id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
+                                remove_num -= 1
                                 # add retry interval since experiment shows that later in try phase, the same neighbor may be eval again
-                                device.neighbor_to_last_accumulate[to_kick_id] = comm_round
-                                device.neighbor_to_accumulate_interval[to_kick_id] = device.neighbor_to_accumulate_interval.get(to_kick_id, 0) + 1
+                                device.neighbor_to_last_accumulate[to_remove_id] = comm_round
+                                device.neighbor_to_accumulate_interval[to_remove_id] = device.neighbor_to_accumulate_interval.get(to_remove_id, 0) + 1
                         else:
                             break
-                elif config_vars["kick_strategy"] == 2:
-                    # kick randomly
+                elif config_vars["remove_strategy"] == 2:
+                    # remove randomly
                     for i in range(len(rep_tuples)):
-                        if kick_num > 0:
-                            kicked_neighbor = device.fav_neighbors.pop(random.randrange(len(device.fav_neighbors)))
-                            print(f"{sensor_id} kicks out {kicked_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
-                            kick_num -= 1
-                            device.neighbor_to_last_accumulate[kicked_neighbor.id] = comm_round
-                            device.neighbor_to_accumulate_interval[kicked_neighbor.id] = device.neighbor_to_accumulate_interval.get(kicked_neighbor.id, 0) + 1
+                        if remove_num > 0:
+                            removeed_neighbor = device.fav_neighbors.pop(random.randrange(len(device.fav_neighbors)))
+                            print(f"{sensor_id} removes out {removeed_neighbor.id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
+                            remove_num -= 1
+                            device.neighbor_to_last_accumulate[removeed_neighbor.id] = comm_round
+                            device.neighbor_to_accumulate_interval[removeed_neighbor.id] = device.neighbor_to_accumulate_interval.get(removeed_neighbor.id, 0) + 1
                         else:
                             break
-                elif config_vars["kick_strategy"] == 3:
-                    # always kick the last added one
+                elif config_vars["remove_strategy"] == 3:
+                    # always remove the last added one
                     if len(device.fav_neighbors) > 0:
-                        kicked = device.fav_neighbors.pop()
-                        print(f"{sensor_id} kicks out {kicked.id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
-                        del neighbor_fl_agg_models_weights[kicked.id]
-                        device.neighbor_to_last_accumulate[kicked.id] = comm_round
-                        device.neighbor_to_accumulate_interval[kicked.id] = device.neighbor_to_accumulate_interval.get(kicked.id, 0) + 1
+                        removeed = device.fav_neighbors.pop()
+                        print(f"{sensor_id} removes out {removeed.id}, leaving {set(fav_neighbor.id for fav_neighbor in device.fav_neighbors)}.")
+                        del neighbor_fl_agg_models_weights[removeed.id]
+                        device.neighbor_to_last_accumulate[removeed.id] = comm_round
+                        device.neighbor_to_accumulate_interval[removeed.id] = device.neighbor_to_accumulate_interval.get(removeed.id, 0) + 1
                 
 
 

@@ -28,25 +28,26 @@ parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFo
 
 # arguments for system vars
 parser.add_argument('-lp', '--logs_dirpath', type=str, default=None, help='the log path where resides the all_device_predicts.pkl, e.g., /content/drive/MyDrive/NeighborFL/logs/09212021_142926_lstm')
-parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different kick strategy')
+parser.add_argument('-lp2', '--logs_dirpath2', type=str, default=None, help='for overwrting neighbor_fl predictions in -lp file due to different remove strategy')
 
 parser.add_argument('-pr', '--plot_rounds', type=int, default=24, help='The number of comm rounds to plot. If starting_comm_round are not specified, plots the last these number of rounds.')
 parser.add_argument('-sr', '--starting_comm_round', type=int, default=None, help='round number to start plotting')
-# parser.add_argument('-er', '--ending_comm_round', type=int, default=None, help='round number to end plotting, inclusive')
-parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, default to 5 mins')
-parser.add_argument('-nsx', '--num_sing_xticks', type=int, default=12, help='how many x-axes (xticks) on single device plot, usually should set to same as plot_rounds')
-parser.add_argument('-nmx', '--num_mul_xticks', type=int, default=4, help='how many x-axes (xticks) on multiple devices plot')
-parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no single figure will be generated')
+parser.add_argument('-tr', '--time_resolution', type=int, default=5, help='time resolution of the data, commonly 5 mins')
+parser.add_argument('-xi', '--xticks_interval', type=int, default=12, help='Specify the number of points to plot within a communication round to ensure accurate round labeling on the x-axis for the representative plots, typically set to the same value as `-tau2p`. The program is hardcoded to create three xticks for subplots.')
+# parser.add_argument('-nsx', '--num_subs_xticks', type=int, default=3, help='how many x-axes (xticks) on the subplots') - hard to implement, default to 3
+parser.add_argument('-r', '--representative', type=str, default=None, help='device id to be the representative figure. If not speified, no representative figure will be generated')
 parser.add_argument('-row', '--row', type=int, default=1, help='number of rows in subplots')
-parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
-parser.add_argument('-f', '--feature', type=str, default='Speed', help='prediciting feature')
-parser.add_argument('-Oseqs', '--output_sequences', type=str, default='1', help='For predictions having output_length > 1, specify the output sequences to plot. For instance, for a prediction having output_length as 5, e.g., [50.72 , 51.77 , 49.75, 66.02 , 66.92], speicying "24" will plot one for the 2nd prediction taking 51.77, and another plot for the 4th prediction taking 66.02. Default to 1.')
+# parser.add_argument('-col', '--column', type=int, default=None, help='number of columns in subplots')
+parser.add_argument('-f', '--feature', type=str, default='Speed', help='feature name of the predictions, used to set up y-axis')
+parser.add_argument('-NFLConfig', '--NFLConfig', type=str, default='', help='NeighborFL configuration name to show on plots and tables, such as R1, R3, L1, L3')
+parser.add_argument('-et', '--error_type', type=str, default='MSE', help='MAE, MSE, RMSE or MAPE')
+parser.add_argument('-Oseqs', '--output_sequences', type=str, default='1', help='For predictions having output_length > 1, specify the output sequences to plot. For instance, for a prediction having output_length as 5, e.g., [50.72 , 51.77 , 49.75, 66.02 , 66.92], specifying "24" will plot one for the 2nd prediction taking 51.77, and another plot for the 4th prediction taking 66.02. Default to 1.')
 
 
 args = parser.parse_args()
 args = args.__dict__
 
-neighbor_fl_config = args["logs_dirpath2"].split("/")[-1] if args["logs_dirpath2"] else args["logs_dirpath"].split("/")[-1]
+neighbor_fl_config = args["NFLConfig"]
 
 COLORS = {'central': 'orange', 'naive_fl': 'green', 'radius_naive_fl': 'grey', 'neighbor_fl': "red", 'true': 'blue'}
 NAMES = {'central': 'Central', 'naive_fl': 'NaiveFL', 'radius_naive_fl': 'r-NaiveFL', 'neighbor_fl': f"NeighborFL {neighbor_fl_config}", 'true': 'TRUE'}
@@ -72,8 +73,8 @@ except:
 input_length = config_vars["input_length"]
 plot_rounds = args["plot_rounds"] # to plot last plot_rounds hours
 time_res = args["time_resolution"]
-num_sing_xticks = args["num_sing_xticks"]
-num_mul_xticks = args["num_mul_xticks"]
+xticks_interval = args["xticks_interval"]
+# num_subs_xticks = args["num_subs_xticks"]
 
 last_comm_round = device_predicts[list(device_predicts.keys())[0]]['true'][-1][0]
 if not args["starting_comm_round"]:
@@ -86,7 +87,8 @@ else:
 s_round = max(1, s_round)
     
 ROW = args["row"]
-COL = args["column"]
+# COL = args["column"]
+COL = None
 if ROW != 1 and COL is None:
     COL = math.ceil(len(device_predicts) / ROW)
     if args["representative"]:
@@ -94,7 +96,7 @@ if ROW != 1 and COL is None:
 
 ''' Variables Required - Above'''
 
-plot_dir_path = f'{logs_dirpath}/plots/realtime_learning_curves_all_devices'
+plot_dir_path = f'{logs_dirpath}/plots/prediction_curves'
 os.makedirs(plot_dir_path, exist_ok=True)
 
 # get output length
@@ -148,6 +150,7 @@ def plot_and_save_two_rows(device_lists, plot_data, output_seq):
     
     # draw 1 representative plot
     rep_sensor_id = args['representative']
+    plotting_range = int(60/time_res * plot_rounds)
     if rep_sensor_id:
         fig, ax = plt.subplots(1, 1, sharex=True, sharey=True)
         plt.setp(ax, ylim=(15, 75))
@@ -156,9 +159,7 @@ def plot_and_save_two_rows(device_lists, plot_data, output_seq):
         
         ax.set_title(rep_sensor_id)
         
-        plotting_range = int(60/time_res * plot_rounds)
-        
-        my_xticks = deque([i for i in range(0, plotting_range, num_sing_xticks)])   
+        my_xticks = deque([i for i in range(0, plotting_range, xticks_interval)])   
         ax.set_xticks(my_xticks)
         
         xticklabels = list(range(s_round, s_round + plot_rounds))
@@ -301,5 +302,5 @@ for output_seq in output_sequences:
     print(f"Output sequence {output_seq} out of {output_sequences}...")
     device_lists, plot_data = make_plot_data(device_predicts, [], output_seq)
     plot_and_save_two_rows(device_lists, plot_data, output_seq)
-    avg_model_error_by_device = calculate_errors_and_output_table(plot_data, "MSE", output_seq)
-    calc_average_prediction_error(avg_model_error_by_device, "MSE", output_seq)
+    avg_model_error_by_device = calculate_errors_and_output_table(plot_data, args['error_type'], output_seq)
+    calc_average_prediction_error(avg_model_error_by_device, args['error_type'], output_seq)

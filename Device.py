@@ -50,7 +50,7 @@ class Device:
         self.num_neighbors_try = num_neighbors_try
         self.add_heuristic = add_heuristic
         self.neighbor_fl_error_records = []
-        self.has_added_neigbor = False # used as one of the conditions to determine whether to kick a fav neighbor
+        self.has_added_neigbor = False # used as one of the conditions to determine whether to remove a fav neighbor
 
     def assign_candidate_neighbors(self, list_of_devices):
         for device_id, device in list_of_devices.items():
