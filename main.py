@@ -402,8 +402,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
             device.has_added_neigbor = False
             chosen_model = device.get_last_neighbor_fl_agg_model() # by default
             
+            predicts = device_predicts[sensor_id]['neighbor_fl'][-1][1]
             # for O > 1, special dealing with y_true and predicts
-            predicts = device_predicts[sensor_id]['neighbor_fl'][-1][1][:-(OUTPUT_LENGTH - 1)] # drop latest
+            if OUTPUT_LENGTH > 1:
+                predicts = predicts[:-(OUTPUT_LENGTH - 1)] # drop latest
             if comm_round > 1:
                 y_true = y_true[OUTPUT_LENGTH - 1:] # drop earlist
             error_without_new_neighbors = get_error(y_true, predicts)  # also works when not selected candidates in last round
