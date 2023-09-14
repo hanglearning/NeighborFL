@@ -60,10 +60,10 @@ reset_random_seeds()
 
 # init default dataset folder
 if not args["dataset_path"]:
-    args["dataset_path"] = f"{os.getcwd()}/data/"
+    args["dataset_path"] = f"{os.getcwd()}/NeighborFL/data/"
 
 if not args["model_save_path"]:
-    args["model_save_path"] = f"{os.getcwd()}/pretrained_models"
+    args["model_save_path"] = f"{os.getcwd()}/NeighborFL/pretrained_models"
 os.makedirs(args["model_save_path"], exist_ok=True)
 
 # read in device file paths
@@ -79,7 +79,7 @@ global_model_0 = create_model(model_units, model_configs)
 
 ''' save used arguments as a text file for easy review '''
 with open(f'{args["model_save_path"]}/args_used.txt', 'w') as f:
-    f.write("Command line arguments used -\n")
+    f.write("Arguments used -\n")
     f.write(' '.join(sys.argv[1:]))
     f.write("\n\nAll arguments used -\n")
     for arg_name, arg in args.items():
@@ -131,4 +131,4 @@ for sensor_id, data in whole_data_record.items():
     new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
     new_model.save(f"{args['model_save_path']}/{sensor_id}.h5")
 
-print(f"Pretrain done till line {min_read_line_num} for each device.")
+print(f"Pretrain done from data index {args['pretrain_start_index']} to {args['pretrain_end_index']} for each device.")

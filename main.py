@@ -112,11 +112,11 @@ eval_neighbor_fl_agg_model_path = 'eval_neighbor_fl_agg'
 
 # init default dataset folder if not specified
 if not args["dataset_path"]:
-    args["dataset_path"] = f"{os.getcwd()}/data/"
+    args["dataset_path"] = f"{os.getcwd()}/NeighborFL/data/"
 
 # init default log root folder if not specified
 if not args["logs_base_folder"]:
-    args["logs_base_folder"] = f"{os.getcwd()}/logs/"
+    args["logs_base_folder"] = f"{os.getcwd()}/NeighborFL/logs/"
 
 print("Preparing - i.e., create device objects, init models, load data, etc,.\nThis may take a few minutes...")
 # determine if resume training
@@ -274,7 +274,7 @@ else:
     
     ''' save used arguments as a text file for easy review '''
     with open(f'{logs_dirpath}/args_used.txt', 'w') as f:
-        f.write("Command line arguments used -\n")
+        f.write("Arguments used -\n")
         f.write(' '.join(sys.argv[1:]))
         f.write("\n\nAll arguments used -\n")
         for arg_name, arg in args.items():
