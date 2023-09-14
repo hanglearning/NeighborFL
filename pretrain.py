@@ -64,6 +64,7 @@ if not args["dataset_path"]:
 
 if not args["model_save_path"]:
     args["model_save_path"] = f"{os.getcwd()}/pretrained_models/"
+os.makedirs(args["model_save_path"], exist_ok=True)
 
 # read in device file paths
 all_device_files = [f for f in listdir(args["dataset_path"]) if isfile(join(args["dataset_path"], f)) and '.csv' in f and not 'location' in f]
@@ -128,6 +129,6 @@ for sensor_id, data in whole_data_record.items():
     print(f"{sensor_id} pretraining")
     init_model = deepcopy(global_model_0)
     new_model = train_model(init_model, X_train, y_train, args['batch'], args['epochs'])
-    new_model.save(f"{args['model_save_path']}_I_{args['input_length']}_O_{args['output_length']}/{sensor_id}.h5")
+    new_model.save(f"{args['model_save_path']}}/{sensor_id}.h5")
 
 print(f"Pretrain done till line {min_read_line_num} for each device.")
