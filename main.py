@@ -419,11 +419,10 @@ for comm_round in range(STARTING_COMM_ROUND, run_comm_rounds + 1):
 
                 print(f"{sensor_id} predicting by the eval_neighbor_fl_agg_model (has the model from the newly eval neighbor(s)).")
                 eval_neighbor_fl_agg_model = device.get_eval_neighbor_fl_agg_model()
-                eval_neighbor_fl_agg_model_predictions = eval_neighbor_fl_agg_model.predict(X_test)
-                eval_neighbor_fl_agg_model_predictions = scaler.inverse_transform(eval_neighbor_fl_agg_model_predictions)
-                
-                # drop latest
-                eval_predicts = eval_neighbor_fl_agg_model_predictions[:-(OUTPUT_LENGTH - 1)]
+                eval_predicts = eval_neighbor_fl_agg_model.predict(X_test)
+                eval_predicts = scaler.inverse_transform(eval_predicts)
+                if OUTPUT_LENGTH > 1:
+                    eval_predicts = eval_predicts[:-(OUTPUT_LENGTH - 1)] # drop latest
                 error_with_new_neighbors = get_error(y_true, eval_predicts)
                 error_diff = error_without_new_neighbors - error_with_new_neighbors
                 if error_diff > 0:
