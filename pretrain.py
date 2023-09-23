@@ -72,9 +72,10 @@ print(f'We have {len(all_device_files)} devices available.')
 
 # init first model
 
-create_model = create_lstm if args["model"] == 'lstm' else create_gru
+create_model = create_lstm if args["model"].lower() == 'lstm' else create_gru
 model_units = [args['input_length'], args['hidden_neurons'], args['hidden_neurons'], args['output_length']]
 model_configs = [args['loss'], args['optimizer'], args['metric']]
+
 global_model_0 = create_model(model_units, model_configs)
 
 ''' save used arguments as a text file for easy review '''

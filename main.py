@@ -164,7 +164,7 @@ if args['resume_path']:
     individual_min_data_sample = config_vars["individual_min_data_sample"]
     device_locations = config_vars["device_locations"]
     
-    create_model = create_lstm if config_vars["model"] == 'lstm' else create_gru
+    create_model = create_lstm if config_vars["model"].lower() == 'lstm' else create_gru
     
     model_units = [config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], config_vars['output_length']]
     model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metric']]
@@ -221,7 +221,7 @@ else:
     
     ''' device init models '''
 
-    create_model = create_lstm if config_vars["model"] == 'lstm' else create_gru
+    create_model = create_lstm if config_vars["model"].lower() == 'lstm' else create_gru
     
     model_units = [config_vars['input_length'], config_vars['hidden_neurons'], config_vars['hidden_neurons'], config_vars['output_length']]
     model_configs = [config_vars['loss'], config_vars['optimizer'], config_vars['metric']]
