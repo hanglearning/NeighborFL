@@ -370,7 +370,7 @@ $ # python NeighborFL/pretrain.py -dp <path/to/data> -ei 2016 -sp <path/to/save/
 
 ~~Replace `<path/to/data>` with the absolute path to the `data` folder where you've placed the downloaded [dataset](https://drive.google.com/drive/folders/1q_IPvLyWw7zJKSyQ89N8fGWVLAfRXaN8?usp=drive_link). For `-sp`, specify any desired path, such as `NeighborFL/pretrained_models`.~~
 
-It appears that running the above command on Google Colab may not produce the exact same pretrained models as those created on our local machine. To reproduce our experiments precisely, please download the [pretrained models](https://drive.google.com/drive/folders/1WDqxGWr8iHX1uxZmA8gRjPN5MI8ul7_c?usp=drive_link) we used for our experiments.
+It appears that running the above command on Google Colab may not produce the exact same pretrained models as those created on our local machine. We are concerned that this command may not reproduce the same models in other environments either. To reproduce our experiments precisely, please download the [pretrained models](https://drive.google.com/drive/folders/1WDqxGWr8iHX1uxZmA8gRjPN5MI8ul7_c?usp=drive_link) we used for our experiments.
 
 **2. Reproduce Experiments with the Pretrained Models**
 
