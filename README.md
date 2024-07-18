@@ -6,7 +6,7 @@
 
 <b>NeighborFL</b> is an individualized real-time federated learning scheme for traffic prediction that incorporates haversine distance as a heuristic and  error-driven  local  models  grouping  from  the  aspect  of  each  individual traffic device. This approach allows NeighborFL to create location-aware and tailored prediction models for each client while fostering collaborative learning. It can be seen as an extension of our prior work, <b>BFRT</b> ([paper](https://drive.google.com/file/d/1WtmQeVPWmMUTlkD0xYskHNRQ6GRrYiyM/view)), which uses a conventional FL aggregation method and equates to <b>NaiveFL</b> in this codebase.
 
-Please refer to [the NeighborFL paper](改) for detailed explanations of the framework.
+Please refer to [the NeighborFL paper](https://arxiv.org/pdf/2407.12226) for detailed explanations of the framework.
 
 ## Run the Simulation
 
@@ -20,7 +20,7 @@ If you prefer to set up and run the code on your local machine, we assume you ar
 
 ### 1. Steps to run the simulation
 
-The gateway to running simulations is [main.py](改). It supports simulating four methods: Central, NaiveFL, r-NaiveFL, and NeighborFL, which can be manually enabled or disabled using the `-lm` argument (explained later). The program scans a folder containing your traffic data (csv) files, identifies each file as a traffic device, and processes the chosen feature (e.g., volume, speed, occupancy) as input for the selected model (e.g., LSTM, GRU, or your customized model). The data processing logic can be found in [process_data.py](改). After loading the data files, the program allows each device to assign its candidate neighbors within a specified radius if NeighborFL is enabled, and then the simulation begins. Unless the number of communication rounds is set via the command line (using `-c`), the code calculates the maximum possible rounds based on the number of data points in the provided files and stops after the last possible round. To assess NeighborFL's performance against the baseline methods, the code includes [two plotting scripts](#evaluate-performance-by-plots-and-error-tables) for generating average prediction error tables, prediction and error curve plots as shown in Section IV of the paper.
+The gateway to running simulations is [main.py](https://github.com/hanglearning/NeighborFL/blob/main/main.py). It supports simulating four methods: Central, NaiveFL, r-NaiveFL, and NeighborFL, which can be manually enabled or disabled using the `-lm` argument (explained later). The program scans a folder containing your traffic data (csv) files, identifies each file as a traffic device, and processes the chosen feature (e.g., volume, speed, occupancy) as input for the selected model (e.g., LSTM, GRU, or your customized model). The data processing logic can be found in [process_data.py](https://github.com/hanglearning/NeighborFL/blob/main/process_data.py). After loading the data files, the program allows each device to assign its candidate neighbors within a specified radius if NeighborFL is enabled, and then the simulation begins. Unless the number of communication rounds is set via the command line (using `-c`), the code calculates the maximum possible rounds based on the number of data points in the provided files and stops after the last possible round. To assess NeighborFL's performance against the baseline methods, the code includes [two plotting scripts](#evaluate-performance-by-plots-and-error-tables) for generating average prediction error tables, prediction and error curve plots as shown in Section IV of the paper.
 
 
 ### (1) Prepare the dataset
@@ -60,7 +60,7 @@ In a nutshell, this command configures each device (identified by its individual
 
 #### ② With pretrained models
 
-To provide pretrained or customized models as initial models for Central and/or federated methods, please store these pretrained model files (in .h5 format) in a designated folder and specify the folder's path using the `-pp` argument to `main.py`. Each device should have its own pretrained model file with a name identical to its corresponding dataset file. You can refer to the [pretrained model files we used in our experiment](https://drive.google.com/drive/folders/1WDqxGWr8iHX1uxZmA8gRjPN5MI8ul7_c?usp=drive_link) for an example. Our pretrained models were generated using the provided [pretrain.py](改).
+To provide pretrained or customized models as initial models for Central and/or federated methods, please store these pretrained model files (in .h5 format) in a designated folder and specify the folder's path using the `-pp` argument to `main.py`. Each device should have its own pretrained model file with a name identical to its corresponding dataset file. You can refer to the [pretrained model files we used in our experiment](https://drive.google.com/drive/folders/1WDqxGWr8iHX1uxZmA8gRjPN5MI8ul7_c?usp=drive_link) for an example. Our pretrained models were generated using the provided [pretrain.py](https://github.com/hanglearning/NeighborFL/blob/main/pretrain.py).
 
 Sample run of `pretrain.py` -
 
@@ -109,7 +109,7 @@ The program supports resuming the simulation process in case the simulation is i
 You may also overwrite some arguments while resuming, such as providing a higher value for `-c` to extend the simulation with more communication rounds than initially configured. The overwritten arguments will also be updated in `config_vars.pkl` for resuming next time. However, please note that some arguments may not support being overwritten, like altering the network model structure by providing `-I` and/or `-O` values different from the models stored in the log folder. Doing so will result in runtime errors, unless you replace the model files in the log folder with the structure of the models that align with the new argument values. **The `-dp` argument for the dataset path does not support overwriting, as the processed dataset is stored in the log folder for convenient resumption.**
   
 
-### All available arguments to [pretrain.py](改) and [main.py](改)
+### All available arguments to [pretrain.py](https://github.com/hanglearning/NeighborFL/blob/main/pretrain.py) and [main.py](https://github.com/hanglearning/NeighborFL/blob/main/main.py)
 
 #### I. Common Arguments for both `pretrain.py` and `main.py`
 
@@ -192,7 +192,7 @@ You may also overwrite some arguments while resuming, such as providing a higher
 
 ## Evaluate Performance by Plots and Error Tables
   
-The code for plotting the experimental results and generating the tables in the paper are provided in the <i>plotting_code</i> folder. [plot_prediction_curves_save_err_table.py](改) was used to plot Figure 3 and create Table III, IV and V.  [plot_error_curves.py](改) was used to plot Figure 4 in the paper. The code will look for `config_vars.pkl` and `all_device_predicts.pkl` files in the `check_point` folder under the specified log folder for these tasks.
+The code for plotting the experimental results and generating the tables in the paper are provided in the <i>plotting_code</i> folder. [plot_prediction_curves_save_err_table.py](https://github.com/hanglearning/NeighborFL/blob/main/plotting_code/plot_prediction_curves_save_err_table.py) was used to plot Figure 3 and create Table III, IV and V.  [plot_error_curves.py](https://github.com/hanglearning/NeighborFL/blob/main/plotting_code/plot_error_curves.py) was used to plot Figure 4 in the paper. The code will look for `config_vars.pkl` and `all_device_predicts.pkl` files in the `check_point` folder under the specified log folder for these tasks.
 
 ### (1) Plot the real-time prediction curves and generate error table
 
@@ -232,7 +232,7 @@ Arguments explanation:
   
 In a nutshell, this sample command will plot the MSE value trends across the entire simulation for the real-time learning process using the same data (`all_device_predicts.pkl`) and plot style as demonstrated in the previous example for plotting prediction curves. The resulting plot is akin to Figure 4 in the paper. The code also calculates and shows the surpass percentage between NeighborFL and available baselines on the figure and labels a star if NeighborFL surpasses NaiveFL for 50% or more. The generated figures will be saved in the `plots/error_curves` directory, which can be found under either the `plot` folder within the `-lp2` specified log folder or under the `plot` folder within the `-lp` specified log folder if `-lp2` is not provided.
 
-### All available arguments to [plot_prediction_curves_save_err_table.py](改) and [plot_error_curves.py](改)
+### All available arguments to [plot_prediction_curves_save_err_table.py](https://github.com/hanglearning/NeighborFL/blob/main/plotting_code/plot_prediction_curves_save_err_table.py) and [plot_error_curves.py](https://github.com/hanglearning/NeighborFL/blob/main/plotting_code/plot_error_curves.py)
 
 #### I. Common Arguments for both `plot_prediction_curves_save_err_table.py` and `plot_error_curves.py`
 
