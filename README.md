@@ -6,7 +6,7 @@
 
 <b>NeighborFL</b> is an individualized real-time federated learning scheme for traffic prediction that incorporates haversine distance as a heuristic and  error-driven  local  models  grouping  from  the  aspect  of  each  individual traffic device. This approach allows NeighborFL to create location-aware and tailored prediction models for each client while fostering collaborative learning. It can be seen as an extension of our prior work, <b>BFRT</b> ([paper](https://drive.google.com/file/d/1WtmQeVPWmMUTlkD0xYskHNRQ6GRrYiyM/view)), which uses a conventional FL aggregation method and equates to <b>NaiveFL</b> in this codebase.
 
-Please refer to [the NeighborFL paper](https://arxiv.org/pdf/2407.12226) for detailed explanations of the framework.
+Please refer to [the NeighborFL paper](https://arxiv.org/pdf/2407.12226) (preprint, under review at T-ITS) for detailed explanations of the framework.
 
 ## Run the Simulation
 
